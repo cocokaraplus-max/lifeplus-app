@@ -489,7 +489,14 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
       const pend = await sql`select count(*)::int as n from bookings where status = 'pending' and ends_at > ${now.toISOString()}::timestamptz`;
       return {
         date: d, weekday: WEEKDAYS[isoWeekday(d) % 7], bookings: list,
-        closures: closures.map((c: Record<string, unknown>) => ({ id: c.id, from: jstTime(c.starts_at as Date), to: jstDate(c.ends_at as Date) > d ? "24:00" : jstTime(c.ends_at as Date), note: c.note ?? "" })),
+        // 前の日から続く休みは 00:00 から、次の日へ続く休みは 24:00 まで（marker: admin-day-closure-clip-v1）
+        closures: closures.map((c: Record<string, unknown>) => {
+          const s = c.starts_at as Date, e = c.ends_at as Date;
+          return {
+            id: c.id, from: jstDate(s) < d ? "00:00" : jstTime(s), to: jstDate(e) > d ? "24:00" : jstTime(e), note: c.note ?? "",
+            startDate: jstDate(s), endDate: jstDate(new Date(e.getTime() - 1)),
+          };
+        }),
         hours: hours.map((h: Record<string, unknown>) => ({ open: h.o, close: h.c })),
         pendingCount: pend[0].n,
       };

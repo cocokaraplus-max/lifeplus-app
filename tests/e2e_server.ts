@@ -25,7 +25,7 @@ Deno.serve({ port: 8765 }, async (req) => {
     try { return new Response(await Deno.readFile(f), { headers: { "content-type": "font/woff2", "access-control-allow-origin": "*" } }); }
     catch { return new Response("", { status: 404 }); }
   }
-  const path = u.pathname === "/" ? "index.html" : u.pathname.slice(1);
+  const path = u.pathname.endsWith("/") ? u.pathname.slice(1) + "index.html" : u.pathname.slice(1);
   try {
     const body = await Deno.readFile(new URL(path, root));
     const type = path.endsWith(".js") ? "text/javascript" : path.endsWith(".css") ? "text/css" : "text/html";
