@@ -17,6 +17,13 @@
     afterProfile: null,  // 登録が済んだら戻る先
   };
 
+  // 接骨院の保険についてのお知らせ（marker: mominoki-insurance-note-v1）
+  var MOMINOKI_NOTE =
+    '<div class="notice" role="note"><b>保険についてのご案内</b>' +
+    "ケガ以外の症状は保険外となりますのでご了承ください。" +
+    '<span class="ex">（保険が適応されない例：肩こり、腰痛、慢性痛、疲労、繰り返しの動作で発生した痛み）</span></div>';
+  function mominokiNote() { return S.business && S.business.id === "mominoki" ? MOMINOKI_NOTE : ""; }
+
   var ERR = {
     no_token: "LINEのログインが切れました。もう一度開き直してください。",
     token_invalid: "LINEのログインが切れました。もう一度開き直してください。",
@@ -222,7 +229,7 @@
       var single = S.data.menus.filter(function (m) { return m.businessId === S.business.id; }).length === 1;
       var h = '<button class="back" id="back">← もどる</button>' + steps(3) +
         "<h2>ご希望の日時をお選びください</h2>" +
-        '<p class="lead">' + esc(S.menu.name) + "（" + S.menu.durationMin + "分）</p>";
+        '<p class="lead">' + esc(S.menu.name) + "（" + S.menu.durationMin + "分）</p>" + mominokiNote();
       var any = false;
       r.days.forEach(function (d) {
         var sat = d.weekday === "土";
@@ -283,6 +290,7 @@
   function confirmView() {
     var p = S.data.profile;
     var h = '<button class="back" id="back">← もどる</button>' + steps(5) + "<h2>この内容で予約しますか？</h2>" +
+      mominokiNote() +
       '<div class="card summary"><dl>' +
       "<dt>ご予約先</dt><dd>" + esc(S.business.name) + "</dd>" +
       "<dt>メニュー</dt><dd>" + esc(S.menu.name) + "（" + S.menu.durationMin + "分）</dd>" +

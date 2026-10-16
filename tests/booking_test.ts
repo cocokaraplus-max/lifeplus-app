@@ -145,6 +145,7 @@ Deno.test({ name: "関所", sanitizeOps: false, sanitizeResources: false, fn: as
     assertEquals(sent.length, 1);
     assertEquals(sent[0].to, ["Uhiro"]);
     assertEquals(sent[0].text.startsWith("【予約が入りました】\n10/29（木）18:00〜"), true);
+    assertEquals(sent[0].text.includes("通院 様（LINE名：LINE太郎）\n電話 0565-00-0000"), true);
   });
 
   await t.step("ドタキャンが2回続いたら、通院中でも仮予約。理由が画面に出る", async () => {

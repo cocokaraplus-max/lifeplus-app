@@ -1,6 +1,6 @@
 // =============================================================
 // LIFE PLUS 予約  関所（Supabase Edge Function: booking）
-// marker: lifeplus-booking-fn-v1 / admin-notify-v1
+// marker: lifeplus-booking-fn-v1 / admin-notify-v1 / notify-contact-v1
 //
 // 予約ページ（LIFF）からの依頼は、すべてここを通る。
 //   1. LINE の ID トークンを LINE 本体に問い合わせて、本人を確かめる
@@ -85,7 +85,7 @@ async function getOrCreateCustomer(sql: Sql, who: { sub: string; name?: string }
     values (${who.sub}, ${lineName})
     on conflict (line_user_id) do update
       set line_name = coalesce(excluded.line_name, customers.line_name)
-    returning id, name, name_kana, phone, is_returning, is_blocked`;
+    returning id, name, name_kana, phone, line_name, is_returning, is_blocked`;
   return rows[0];
 }
 
@@ -108,6 +108,14 @@ function profileOf(
 async function holdOf(sql: Sql, customerId: string): Promise<boolean> {
   const r = await sql`select lp_noshow_hold(${customerId}::uuid) as h`;
   return !!r[0].h;
+}
+
+// 知らせに添える連絡先（名前・LINE名・電話）
+function contactLine(c: { name: string | null; line_name?: string | null; phone: string | null }) {
+  const p = String(c.phone ?? "");
+  const tel = p.length === 11 ? `${p.slice(0, 3)}-${p.slice(3, 7)}-${p.slice(7)}`
+    : p.length === 10 ? `${p.slice(0, 4)}-${p.slice(4, 6)}-${p.slice(6)}` : p;
+  return `${c.name ?? ""} 様` + (c.line_name ? `（LINE名：${c.line_name}）` : "") + (tel ? `\n電話 ${tel}` : "");
 }
 
 async function adminIds(sql: Sql): Promise<string[]> {
@@ -295,7 +303,7 @@ export async function handle(body: any, deps: Deps): Promise<Record<string, unkn
         const head = bk.status === "confirmed" ? "【予約が入りました】" : "【確認待ちの仮予約】";
         const why = bk.status === "confirmed" ? "" : hold ? "\n※ドタキャンが続いている方です" : "\n※はじめての方です";
         await tellAdmin(deps,
-          `${head}\n${bk.date.slice(5).replace("-", "/")}（${bk.weekday}）${bk.time}〜\n${bk.businessName}　${bk.menuName}\n${cust.name} 様${why}`);
+          `${head}\n${bk.date.slice(5).replace("-", "/")}（${bk.weekday}）${bk.time}〜\n${bk.businessName}　${bk.menuName}\n${contactLine(cust)}${why}`);
       }
       return { booking: bk, bookings: mine };
     }
@@ -319,7 +327,7 @@ export async function handle(body: any, deps: Deps): Promise<Record<string, unkn
         const s = b[0].starts_at as Date;
         const d = jstDate(s);
         await tellAdmin(deps,
-          `【予約の取り消し】\n${d.slice(5).replace("-", "/")}（${WEEKDAYS[new Date(d + "T00:00:00Z").getUTCDay()]}）${jstTime(s)}〜\n${b[0].menu_name}\n${cust.name} 様`);
+          `【予約の取り消し】\n${d.slice(5).replace("-", "/")}（${WEEKDAYS[new Date(d + "T00:00:00Z").getUTCDay()]}）${jstTime(s)}〜\n${b[0].menu_name}\n${contactLine(cust)}`);
       }
       if (!rows.length) {
         const exists = await sql`
