@@ -176,6 +176,30 @@ Deno.test({ name: "管理画面", sanitizeOps: false, sanitizeResources: false, 
     await sql`delete from staff_members`;
   });
 
+  await t.step("テストで入れた人を消す（HIROさんだけ・予約の履歴ごと）", async () => {
+    const r = await call("hiro", { action: "admin_book", name: "テスト 消す", menuId: mid("施術（保険）"), startsAt: "2026-11-05T17:00:00+09:00" });
+    // deno-lint-ignore no-explicit-any
+    const c = ((await call("hiro", { action: "admin_customers", q: "テスト 消す" })).customers as any[])[0];
+    // 進行中の予約は1件消しできない（先に取り消す）
+    eq(await code(call("hiro", { action: "admin_booking_delete", bookingId: r.id })), "booking_active");
+    await call("hiro", { action: "admin_cancel", bookingId: r.id });
+    // スタッフには消せない
+    const inv = await call("hiro", { action: "admin_staff_invite", label: "全部さん", perms: ["closures", "bookings", "customers", "notify"] });
+    await call("all", { action: "staff_join", code: inv.code });
+    eq(await code(call("all", { action: "admin_booking_delete", bookingId: r.id })), "no_permission");
+    eq(await code(call("all", { action: "admin_customer_delete", customerId: c.id })), "no_permission");
+    await sql`delete from staff_members`;
+    // 1件だけ消す
+    await call("hiro", { action: "admin_booking_delete", bookingId: r.id });
+    eq(((await call("hiro", { action: "admin_customer", customerId: c.id })).bookings as unknown[]).length, 0);
+    // 人ごと消す（予約の履歴も消える）
+    await call("hiro", { action: "admin_book", customerId: c.id, menuId: mid("施術（保険）"), startsAt: "2026-11-05T17:15:00+09:00" });
+    const d = await call("hiro", { action: "admin_customer_delete", customerId: c.id });
+    eq(d.bookings, 1);
+    eq(((await call("hiro", { action: "admin_customers", q: "テスト 消す" })).customers as unknown[]).length, 0);
+    eq(await code(call("hiro", { action: "admin_customer_delete", customerId: c.id })), "customer_not_found");
+  });
+
   await sql`update app_settings set value = '' where key = 'admin_line_user_ids'`;
   await sql.end();
 }});

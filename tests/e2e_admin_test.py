@@ -185,9 +185,22 @@ with sync_playwright() as p:
     pg.screenshot(path=f"{SHOTS}/a13_big.png")
     check("横にはみ出さない", pg.evaluate("document.documentElement.scrollWidth <= innerWidth"))
 
+    # 10b. テストで入れた人を消す（予約の履歴ごと）
+    pg.get_by_role("button", name="標準").click()
+    pg.get_by_role("button", name="お客さま").click()
+    expect(pg.locator(".cust")).to_have_count(2)
+    pg.locator(".cust", has_text="電話 花子").click()
+    pg.locator("#tdel").click()
+    pg.screenshot(path=f"{SHOTS}/a14b_delete.png")
+    pg.locator("#cfy").click()
+    expect(pg.locator("#toast")).to_contain_text("消しました")
+    expect(pg.locator(".cust")).to_have_count(1)
+    check("人を消すと名簿から消える", pg.locator(".cust", has_text="電話 花子").count() == 0)
+    d = api("hiro", "admin_day", date="2026-10-19")
+    check("その人の予約も予約表から消える", all(x["customer"]["name"] != "電話 花子" for x in d["bookings"]))
+
     # 11. スタッフを招待する → 相手が開くと参加 → 選んだことだけできる
     subprocess.run(DB + ["delete from staff_members;"], check=True)
-    pg.get_by_role("button", name="標準").click()
     pg.get_by_role("button", name="スタッフ").click()
     expect(pg.get_by_text("まだ誰もいません。")).to_be_visible()
     pg.get_by_role("button", name="＋ 人を追加する（招待リンクを作る）").click()
@@ -201,6 +214,7 @@ with sync_playwright() as p:
     pg.locator("#iok").click()
     expect(pg.locator(".cust .pill")).to_have_text("招待中")
 
+    api("hiro", "admin_book", name="確認 用", menuId=mid["施術（保険）"], startsAt="2026-10-19T18:00:00+09:00")
     ps = new_ctx().new_page()  # 別の人の LINE（保存場所を分ける）
     ps.on("pageerror", lambda e: errors.append(str(e)))
     ps.add_init_script("localStorage.setItem('u','staff')")

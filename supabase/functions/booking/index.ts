@@ -785,6 +785,30 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
       return { ok: true, id, sent };
     }
 
+    // 消す（HIROさんだけ。テストで入れた人など）  marker: admin-delete-v1
+    // お客さまを消すと、その人の予約の履歴もすべて消える。元に戻せない。
+    case "admin_customer_delete": {
+      const id = str(body.customerId, 40);
+      if (!UUID_RE.test(id)) throw new ApiError("customer_not_found");
+      const n = await sql.begin(async (tx: Sql) => {
+        const b = await tx`delete from bookings where customer_id = ${id}::uuid returning id`;
+        const c = await tx`delete from customers where id = ${id}::uuid returning id`;
+        if (!c.length) throw new ApiError("customer_not_found", 404);
+        return b.length;
+      });
+      return { ok: true, bookings: n };
+    }
+    // 予約を1件だけ消す（取り消し済み・来院済みなど、終わったものだけ）
+    case "admin_booking_delete": {
+      const id = str(body.bookingId, 40);
+      if (!UUID_RE.test(id)) throw new ApiError("booking_not_found");
+      const cur = await sql`select status from bookings where id = ${id}::uuid`;
+      if (!cur.length) throw new ApiError("booking_not_found", 404);
+      if (cur[0].status === "pending" || cur[0].status === "confirmed") throw new ApiError("booking_active", 409);
+      await sql`delete from bookings where id = ${id}::uuid`;
+      return { ok: true };
+    }
+
     // 管理画面を使える人（HIROさんだけが触れる）
     case "admin_staff": {
       const rows = await sql`select * from staff_members order by created_at`;

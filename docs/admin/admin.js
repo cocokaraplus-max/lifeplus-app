@@ -29,6 +29,7 @@
     invite_already_staff: "このLINEはすでに参加しています。",
     label_required: "呼び名を入れてください。",
     staff_not_found: "この人は見つかりませんでした。",
+    booking_active: "まだ有効な予約です。先に「取り消す」をしてから消してください。",
     no_token: "LINEのログインが切れました。開き直してください。",
     token_invalid: "LINEのログインが切れました。開き直してください。",
     booking_not_pending: "この予約はもう確認済みです。",
@@ -400,6 +401,8 @@
       h += '<div class="acts"><button class="btn gray" data-do="redo">記録を付け直す</button>' + (c.hasLine && can("customers") ? '<button class="btn line" data-do="msg">LINEで連絡</button>' : "") + "</div>";
     }
     if (can("customers")) h += '<button class="btn gray wide" data-do="cust">この方の情報・履歴を見る</button>';
+    if (owner() && b.status !== "pending" && b.status !== "confirmed")
+      h += '<div class="danger-zone" style="text-align:center"><button class="link red" data-do="delbk">この予約を履歴から消す</button></div>';
     openSheet(h);
 
     var done = function (msg) { return function () { closeSheet(); toast(msg); refresh(); }; };
@@ -422,6 +425,9 @@
         }, fail);
       }
       if (k === "cust") custSheet(c.id);
+      if (k === "delbk") confirmSheet("この予約を履歴から消しますか？", dayText(b.date) + " " + b.time + "〜 " + b.menuName + " の記録を消します。来院回数などの数え方からも消えます。元に戻せません。", "消す", function () {
+        return api("admin_booking_delete", { bookingId: b.id }).then(function () { closeSheet(); toast("消しました"); refresh(); });
+      });
     }, $sb);
   }
   function cardOf(b) {
@@ -645,7 +651,8 @@
           '<div class="hist"><h2 style="font-size:16px">履歴</h2>' +
           (hst.bookings.length ? hst.bookings.map(function (b) {
             return '<button class="h" data-bk="' + esc(b.id) + '" style="width:100%;background:none;border:0;border-bottom:1px solid var(--line);text-align:left"><span>' + mds(b.date) + "（" + WD[wdOf(b.date)] + "）" + esc(b.time) + "　" + esc(b.menuName) + "</span><b>" + esc(STATUS[b.status] || b.status) + "</b></button>";
-          }).join("") : '<p class="note">まだ予約はありません。</p>') + "</div>");
+          }).join("") : '<p class="note">まだ予約はありません。</p>') + "</div>" +
+          (owner() ? '<div class="danger-zone" style="text-align:center;margin-top:16px"><button class="link red" id="tdel">この方を消す（テストで入れた人など）</button></div>' : ""));
         $("#ts").onclick = function () {
           busy($("#ts"), api("admin_customer_update", { customerId: c.id, isReturning: $("#tr").checked, isBlocked: $("#tb").checked, memo: $("#tm").value })).then(function () {
             c.isReturning = $("#tr").checked; c.isBlocked = $("#tb").checked; c.memo = $("#tm").value;
@@ -653,6 +660,16 @@
           }, fail);
         };
         if ($("#tl")) $("#tl").onclick = function () { msgSheet(c); };
+        if ($("#tdel")) $("#tdel").onclick = function () {
+          var n = hst.bookings.length;
+          confirmSheet("「" + c.name + "」を消しますか？", "名簿から消え、予約の履歴" + (n ? " " + n + "件" : "") + "もすべて消えます。元に戻せません。" +
+            (hst.bookings.some(function (b) { return (b.status === "pending" || b.status === "confirmed") && !isPast(b); }) ? "これからの予約も消えます（患者さんには知らせません）。" : ""), "消す", function () {
+            return api("admin_customer_delete", { customerId: c.id }).then(function (r) {
+              closeSheet(); toast("消しました（予約の履歴 " + r.bookings + "件）");
+              if (A.tab === "cust") loadCust(); else refresh();
+            });
+          });
+        };
         if ($("#tk")) $("#tk").onclick = function () { bookForm({ date: A.date || A.init.today, customer: c }); };
         on("[data-bk]", function (el) { slip(el.getAttribute("data-bk"), hst.bookings); }, $sb);
       });
