@@ -1,4 +1,4 @@
-/* LIFE PLUS 予約ページ  手帳とハンコ  marker: lifeplus-techo-style-v1 / textsize-v1 */
+/* LIFE PLUS 予約ページ  手帳とハンコ  marker: lifeplus-techo-style-v1 / textsize-v1 / udgothic-v1 */
 :root {
   --ink: #24324a;
   --mute: #6f7889;
@@ -18,7 +18,7 @@ body {
   margin: 0;
   background: var(--desk);
   color: var(--ink);
-  font: 17px/1.65 "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+  font: 400 17px/1.7 "BIZ UDPGothic", "BIZ UDPゴシック", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
   padding-bottom: env(safe-area-inset-bottom);
 }
 button { font: inherit; color: inherit; }
@@ -28,10 +28,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--mo); outlin
 .top { padding: 16px 16px 6px; }
 .brand { display: flex; align-items: center; gap: 12px; max-width: 560px; margin: 0 auto; }
 .leaf { width: 40px; height: 40px; border-radius: 50%; flex: none; border: 2.5px solid var(--red); color: var(--red);
-  display: grid; place-items: center; transform: rotate(-8deg); font-weight: 900; font-size: 13px; line-height: 1; }
+  display: grid; place-items: center; transform: rotate(-8deg); font-weight: 800; font-size: 13px; line-height: 1; }
 .leaf::before { content: "予約"; }
 .brand-sub { font-size: 12px; color: var(--mute); line-height: 1.3; }
-.brand-title { margin: 0; font-size: 22px; line-height: 1.3; font-weight: 900; }
+.brand-title { margin: 0; font-size: 22px; line-height: 1.3; font-weight: 800; }
 
 /* ---------- 手帳のページ ---------- */
 main {
@@ -48,7 +48,7 @@ main::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; widt
 .small { font-size: 12px; }
 
 /* ---------- 共通 ---------- */
-h2 { font-size: 21px; font-weight: 900; margin: 4px 0 12px; padding-bottom: 8px; border-bottom: 2px solid var(--ink); }
+h2 { font-size: 21px; font-weight: 800; margin: 4px 0 12px; padding-bottom: 8px; border-bottom: 2px solid var(--ink); }
 .lead { color: var(--mute); font-size: 15px; margin: -4px 0 14px; }
 .card { border-bottom: 1px solid var(--rule); padding: 14px 0; }
 .steps { display: flex; gap: 6px; margin: 0 0 12px; }
@@ -69,7 +69,7 @@ h2 { font-size: 21px; font-weight: 900; margin: 4px 0 12px; padding-bottom: 8px;
   background: none; padding: 15px 2px; cursor: pointer; }
 .choice:active { background: #f7f1e6; }
 .choice .dot { width: 30px; height: 30px; border-radius: 8px; flex: none; display: grid; place-items: center; color: #fff;
-  font-weight: 900; font-size: 15px; background: var(--ink) !important; }
+  font-weight: 800; font-size: 15px; background: var(--ink) !important; }
 .choice[data-biz="mominoki"] .dot { background: var(--mo) !important; }
 .choice[data-biz="mominoki"] .dot::before { content: "接"; }
 .choice[data-biz="bodycare"] .dot { background: var(--bc) !important; }
@@ -77,13 +77,13 @@ h2 { font-size: 21px; font-weight: 900; margin: 4px 0 12px; padding-bottom: 8px;
 .choice .body { flex: 1; min-width: 0; }
 .choice .name { font-weight: 700; font-size: 18px; line-height: 1.4; }
 .choice .meta { color: var(--mute); font-size: 14px; }
-.choice .price { font-weight: 900; white-space: nowrap; }
+.choice .price { font-weight: 800; white-space: nowrap; }
 .choice .chev { color: var(--mute); font-size: 22px; }
 
 /* ---------- 日付と時間 ---------- */
 .day { border-bottom: 1px solid var(--rule); padding: 12px 0 14px; }
 .day-head { display: flex; align-items: baseline; gap: 6px; margin-bottom: 8px; }
-.day-date { font-weight: 900; font-size: 19px; }
+.day-date { font-weight: 800; font-size: 19px; }
 .day-wd { font-weight: 700; }
 .day-wd.sat { color: var(--mo); }
 .day-full { color: var(--mute); font-size: 14px; margin-left: auto; }
@@ -109,10 +109,10 @@ label.f input:focus { outline: none; border-bottom-color: var(--mo); background:
 
 /* ---------- 予約（伝票） ---------- */
 .bk { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: start; position: relative; }
-.bk .when { font-weight: 900; font-size: 19px; }
+.bk .when { font-weight: 800; font-size: 19px; }
 .bk .what { color: var(--mute); font-size: 15px; grid-column: 1 / -1; padding-right: 64px; }
 .badge { width: 58px; height: 58px; border-radius: 50%; border: 2.5px solid currentColor; display: grid; place-items: center; text-align: center;
-  font-size: 12.5px; font-weight: 900; line-height: 1.1; transform: rotate(-9deg); grid-row: 1 / span 3; grid-column: 2; background: rgba(255,253,247,.7); }
+  font-size: 12.5px; font-weight: 800; line-height: 1.1; transform: rotate(-9deg); grid-row: 1 / span 3; grid-column: 2; background: rgba(255,253,247,.7); }
 .badge.pending { color: var(--red); }
 .badge.confirmed { color: var(--mo); }
 .bk .actions { grid-column: 1 / -1; margin-top: 4px; }
@@ -125,7 +125,7 @@ label.f input:focus { outline: none; border-bottom-color: var(--mo); background:
 .ok-mark { width: 104px; height: 104px; border-radius: 50%; border: 3.5px solid var(--red); color: var(--red); display: grid; place-items: center;
   font-size: 0; margin: 14px auto 10px; transform: rotate(-10deg); position: relative; }
 .ok-mark::after { content: ""; position: absolute; inset: 6px; border: 1.5px solid var(--red); border-radius: 50%; }
-.ok-mark::before { content: "受付"; font-size: 24px; font-weight: 900; }
+.ok-mark::before { content: "受付"; font-size: 24px; font-weight: 800; }
 .ok-mark.confirmed { border-color: var(--mo); color: var(--mo); }
 .ok-mark.confirmed::after { border-color: var(--mo); }
 .ok-mark.confirmed::before { content: "確定"; }
@@ -156,3 +156,8 @@ label.f input:focus { outline: none; border-bottom-color: var(--mo); background:
 .size button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
 main, .foot, .toast { zoom: var(--text-zoom, 1); }
 .times { grid-template-columns: repeat(var(--time-cols, 4), 1fr); }
+
+/* 小さい文字と灰色の文字は少し濃く（読みやすさ優先） */
+.lead, .meta, .day-full, .note, .brand-sub, .foot, .size-lb, .summary dt { color: #5b6476; }
+.btn, .time, .chip, .size button { font-family: inherit; font-weight: 700; }
+.choice .meta, .bk .what, .lead { font-weight: 400; }
