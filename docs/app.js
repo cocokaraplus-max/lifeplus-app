@@ -1,4 +1,4 @@
-/* LIFE PLUS 予約ページ（LIFF）  marker: lifeplus-liff-v1
+/* LIFE PLUS 予約ページ（LIFF）  marker: lifeplus-liff-v1 / techo-v1
    流れ：ホーム（自分の予約）→ 事業 → メニュー → 日時 → 症状 → 確認 → 完了
    予約・取消・登録はすべて関所（API_URL）を通す。ページ側は何も決めない。 */
 (function () {
@@ -59,7 +59,7 @@
     return h + "</div>";
   }
   function bizOf(id) { return (S.data.businesses || []).filter(function (b) { return b.id === id; })[0]; }
-  function setAccent(color) { document.documentElement.style.setProperty("--accent", color || "#2e7d5b"); }
+  function setAccent() { /* 手帳の色は1つ（事業の色は印だけで出す） */ }
 
   // ---------- 関所への問い合わせ ----------
   function api(action, payload) {
@@ -103,7 +103,7 @@
       bs.forEach(function (b) {
         h += '<div class="card bk">' +
           '<div class="when">' + md(b.date) + "（" + esc(b.weekday) + "）" + esc(b.time) + "〜</div>" +
-          '<span class="badge ' + esc(b.status) + '">' + (b.status === "confirmed" ? "確定" : "確認中") + "</span>" +
+          '<span class="badge ' + esc(b.status) + '">' + (b.status === "confirmed" ? "確定" : "確認<br>待ち") + "</span>" +
           '<div class="what">' + esc(b.businessName) + "　" + esc(b.menuName) + "</div>" +
           (b.status === "pending" ? '<div class="what">内容を確認して、LINEで確定のご連絡をします。</div>' : "") +
           '<div class="actions"><button class="btn danger" data-cancel="' + esc(b.id) + '">このご予約を取り消す</button></div>' +
@@ -311,7 +311,7 @@
   function done(b) {
     var ok = b && b.status === "confirmed";
     var h = '<div class="card center">' +
-      '<div class="ok-mark" aria-hidden="true">✓</div>' +
+      '<div class="ok-mark' + (ok ? " confirmed" : "") + '" aria-hidden="true"></div>' +
       "<h2>" + (ok ? "ご予約が確定しました" : "仮予約を受け付けました") + "</h2>" +
       (b ? "<p><b>" + md(b.date) + "（" + esc(b.weekday) + "）" + esc(b.time) + "〜</b><br>" + esc(b.businessName) + "　" + esc(b.menuName) + "</p>" : "") +
       (ok ? "<p>当日お待ちしております。</p>" : "<p>内容を確認して、LINEで確定のご連絡をします。<br>もうしばらくお待ちください。</p>") +

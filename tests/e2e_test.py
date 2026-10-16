@@ -34,6 +34,8 @@ with sync_playwright() as p:
     ctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, locale="ja-JP")
     ctx.route("https://static.line-scdn.net/**", lambda r: r.fulfill(body=FAKE_LIFF, content_type="text/javascript"))
     ctx.route("**/config.js", lambda r: r.fulfill(body=CONFIG, content_type="text/javascript"))
+    FONT = "".join(f"@font-face{{font-family:'Zen Maru Gothic';font-weight:{w};src:url(http://127.0.0.1:8765/__font/{w})}}" for w in (500,700,900))
+    ctx.route("https://fonts.googleapis.com/**", lambda r: r.fulfill(body=FONT, content_type="text/css"))
     pg = ctx.new_page()
     errors = []
     pg.on("pageerror", lambda e: errors.append(str(e)))
@@ -72,7 +74,7 @@ with sync_playwright() as p:
     expect(pg.get_by_role("heading", name="仮予約を受け付けました")).to_be_visible()
     pg.screenshot(path=f"{SHOTS}/08_done.png")
     pg.get_by_role("button", name="ご予約の状況へ").click()
-    check("ホームに確認中の予約が1件", pg.locator(".bk").count() == 1 and pg.locator(".badge.pending").count() == 1)
+    check("ホームに確認待ちの予約が1件", pg.locator(".bk").count() == 1 and pg.locator(".badge.pending").count() == 1)
     pg.screenshot(path=f"{SHOTS}/09_home_booked.png")
 
     # 2. 接骨院はメニューが1つなので日時へ直行。17:00〜18:15 は埋まっていて最初は18:15

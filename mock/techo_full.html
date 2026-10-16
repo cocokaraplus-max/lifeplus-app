@@ -1,0 +1,239 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8">
+<style>
+@font-face{font-family:ZM;font-weight:500;src:url(node_modules/@fontsource/zen-maru-gothic/files/zen-maru-gothic-japanese-500-normal.woff2)}
+@font-face{font-family:ZM;font-weight:700;src:url(node_modules/@fontsource/zen-maru-gothic/files/zen-maru-gothic-japanese-700-normal.woff2)}
+@font-face{font-family:ZM;font-weight:900;src:url(node_modules/@fontsource/zen-maru-gothic/files/zen-maru-gothic-japanese-900-normal.woff2)}
+:root{--ink:#24324a;--mute:#7a8396;--paper:#fffdf7;--desk:#efe9df;--rule:#e9e1d3;--red:#c8372d;--mo:#2f5d8a;--bc:#c96f4a}
+*{box-sizing:border-box}body{margin:0;background:#e4e0d9}
+.stage{display:flex;gap:24px;padding:24px}
+.phone{width:390px;height:844px;overflow:hidden;position:relative;font-family:ZM,sans-serif;color:var(--ink);background:var(--desk);flex:none}
+.page{position:absolute;inset:14px 14px 70px 14px;background:var(--paper);border-radius:6px 18px 18px 6px;box-shadow:0 2px 0 #e2d9c9,0 6px 18px rgba(80,60,30,.12);overflow:hidden}
+.page::before{content:"";position:absolute;left:0;top:0;bottom:0;width:14px;background:repeating-linear-gradient(to bottom,#d9cfbf 0 2px,transparent 2px 22px);opacity:.6;z-index:2}
+.hd{padding:18px 20px 10px 34px;border-bottom:2px solid var(--ink);display:flex;align-items:baseline;gap:10px}
+.hd .m{font-size:15px;font-weight:700}.hd .dd{font-size:46px;font-weight:900;line-height:1}.hd .w{font-size:18px;font-weight:700}
+.hd .r{margin-left:auto;font-size:12px;color:var(--mute);text-align:right}
+.hd.t{align-items:center}.hd.t h1{margin:0;font-size:26px;font-weight:900}
+.rows{padding:0 16px 0 34px}
+.r{display:flex;min-height:46px;border-bottom:1px solid var(--rule);align-items:center;position:relative}
+.r .t{width:52px;font-weight:700;font-size:14px;color:var(--mute)}
+.r.h .t{color:var(--ink);font-size:15px}
+.r .c{flex:1;font-size:15.5px;font-weight:700;display:flex;align-items:center;gap:8px}
+.r .c small{font-weight:500;font-size:12px;color:var(--mute)}
+.mark{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:12px;font-weight:900;color:#fff;flex:none;font-style:normal}
+.mk-mo{background:var(--mo)}.mk-bc{background:var(--bc)}
+.long{background:linear-gradient(90deg,rgba(201,111,74,.12),transparent)}
+.r .c.free{color:#b9b0a1;font-weight:500;font-size:13.5px}
+.hanko{position:absolute;right:6px;top:50%;transform:translateY(-50%) rotate(-8deg);width:50px;height:50px;border:2.5px solid var(--red);border-radius:50%;color:var(--red);font-weight:900;font-size:12px;display:grid;place-items:center;text-align:center;line-height:1.1;background:rgba(255,253,247,.6)}
+.tabs{position:absolute;left:0;right:0;bottom:0;height:62px;display:flex;justify-content:space-around;align-items:center;font-size:12px;color:var(--mute);font-weight:700}
+.tabs .on{color:var(--ink);border-bottom:3px solid var(--ink);padding-bottom:3px}
+.tabs .b{background:var(--red);color:#fff;border-radius:999px;padding:0 6px;margin-left:3px;font-size:11px}
+.fab{position:absolute;right:26px;bottom:84px;width:56px;height:56px;border-radius:50%;background:var(--ink);color:var(--paper);font-size:28px;display:grid;place-items:center;box-shadow:0 6px 14px rgba(36,50,74,.3)}
+
+/* 詳細シート（伝票） */
+.dim{position:absolute;inset:0;background:rgba(36,50,74,.45);z-index:5}
+.slip{position:absolute;left:14px;right:14px;bottom:14px;background:var(--paper);border-radius:14px;padding:20px 20px 18px;z-index:6;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.slip::before{content:"";position:absolute;left:0;right:0;top:-8px;height:16px;background:radial-gradient(circle at 8px 0,transparent 7px,var(--paper) 7.5px) 0 0/16px 16px repeat-x}
+.slip .ttl{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--mute);border-bottom:2px solid var(--ink);padding-bottom:8px}
+.slip h2{margin:12px 0 0;font-size:26px;font-weight:900}
+.slip .kana{font-size:13px;color:var(--mute)}
+.slip dl{margin:12px 0 0}
+.slip dl div{display:flex;padding:9px 0;border-bottom:1px dashed #d9cfbf;font-size:15px}
+.slip dt{width:6.2em;color:var(--mute);font-size:13.5px}
+.slip dd{margin:0;font-weight:700;flex:1}
+.slip .tel{text-decoration:underline;text-underline-offset:3px}
+.slip .stampwrap{position:absolute;right:20px;top:58px}
+.bigstamp{width:86px;height:86px;border:3px solid var(--red);border-radius:50%;color:var(--red);display:grid;place-items:center;text-align:center;font-weight:900;font-size:15px;line-height:1.15;transform:rotate(-10deg);opacity:.9;position:relative}
+.bigstamp::after{content:"";position:absolute;inset:5px;border:1px solid var(--red);border-radius:50%}
+.note{font-size:12px;color:var(--mute);margin:12px 0}
+.acts{display:flex;gap:8px}.btn.solid{flex:1.6}
+.btn{background:none;color:var(--ink);flex:1;border-radius:12px;padding:14px 0;font-weight:700;font-size:16px;text-align:center;font-family:ZM,sans-serif}
+.btn.solid{background:var(--ink);color:var(--paper)}
+.btn.line{border:2px solid var(--ink)}
+.btn.small{flex:none;padding:14px 14px;border-color:#b9b0a1;color:var(--mute);font-size:14px}
+.btn .ic{display:inline-block;width:22px;height:22px;border:2px solid var(--paper);border-radius:50%;font-size:11px;line-height:18px;vertical-align:2px;margin-right:6px}
+
+/* 月のページ */
+.cal{display:grid;grid-template-columns:repeat(7,1fr);padding:6px 14px 0 30px}
+.cal .wd{text-align:center;font-size:12px;color:var(--mute);padding:8px 0 4px;border-bottom:1px solid var(--rule)}
+.cal .wd.sat{color:var(--mo)}.cal .wd.sun{color:var(--red)}
+.cal .d{height:58px;border-bottom:1px solid var(--rule);border-right:1px solid var(--rule);padding:4px 5px;font-size:14px;font-weight:700;position:relative}
+.cal .d:nth-child(7n){border-right:0}
+.cal .d.x{color:#cfc6b7;font-weight:500}
+.cal .d .cnt{position:absolute;left:5px;bottom:4px;font-size:10.5px;color:var(--mute);font-weight:500}
+.cal .d .st{position:absolute;right:3px;bottom:3px;width:28px;height:28px;border:2px solid var(--red);border-radius:50%;color:var(--red);font-size:12px;font-weight:900;display:grid;place-items:center;transform:rotate(-12deg)}
+.cal .d .st.half{width:auto;height:auto;border-radius:5px;padding:1px 3px;font-size:9.5px;line-height:1.2;text-align:center}
+.cal .d.today{background:rgba(47,93,138,.08)}
+.offl{padding:12px 16px 0 34px}
+.offl h3{margin:6px 0 4px;font-size:14px}
+.oi{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--rule);font-size:14px}
+.oi b{width:7.6em}.oi span{flex:1;color:var(--mute);font-size:13px}.oi u{font-size:12.5px;text-underline-offset:3px}
+.hint{font-size:12px;color:var(--mute);padding:8px 16px 0 34px}
+
+/* 名簿 */
+.idx{position:absolute;right:0;top:110px;display:flex;flex-direction:column;gap:2px;z-index:3}
+.idx span{background:#ece4d6;border-radius:8px 0 0 8px;padding:5px 7px 5px 9px;font-size:12px;font-weight:700;color:var(--mute)}
+.idx span.on{background:var(--ink);color:var(--paper)}
+.srch{margin:12px 34px 6px 34px;border-bottom:2px solid var(--ink);padding:6px 0;color:#b9b0a1;font-size:14px}
+.cu{display:flex;align-items:center;gap:10px;padding:10px 40px 10px 34px;border-bottom:1px solid var(--rule);position:relative}
+.cu .nm{font-weight:700;font-size:16px}.cu .sub{font-size:12px;color:var(--mute)}
+.cu .g{flex:1}
+.seal{font-size:11px;font-weight:900;border-radius:4px;padding:2px 5px;border:1.5px solid currentColor;transform:rotate(-4deg)}
+.seal.reg{color:var(--mo)}.seal.new{color:var(--red)}.seal.blk{color:#555;background:#eee}
+.cu.blocked .nm{text-decoration:line-through;color:var(--mute)}
+.grp{padding:8px 34px 2px;font-size:12px;font-weight:900;color:var(--mute);background:#faf6ee;border-bottom:1px solid var(--rule)}
+
+.seal.ns{color:#fff;background:var(--red);border-color:var(--red)}
+.hist{display:flex;gap:6px;margin:8px 0 0;flex-wrap:wrap}
+.hist span{font-size:12px;font-weight:700;border:1.5px solid var(--rule-strong,#d9cfbf);border-radius:999px;padding:2px 9px;color:var(--mute)}
+.hist span.bad{border-color:var(--red);color:var(--red)}
+.out{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.ob{border:2px solid var(--ink);border-radius:12px;padding:10px 0 8px;text-align:center;font-weight:700;font-size:14px;background:none;font-family:ZM,sans-serif;color:var(--ink)}
+.ob i{display:block;margin:0 auto 4px;width:36px;height:36px;border-radius:50%;border:2px solid currentColor;font-style:normal;font-size:12px;line-height:32px;font-weight:900;transform:rotate(-8deg)}
+.ob.come{color:var(--mo);border-color:var(--mo)}
+.ob.late{color:#9a6b1f;border-color:#c9a25a}
+.ob.ns{color:var(--red);border-color:var(--red)}
+.r .done{position:absolute;right:6px;top:50%;transform:translateY(-50%) rotate(-8deg);font-size:11px;font-weight:900;border-radius:50%;width:44px;height:44px;display:grid;place-items:center;border:2px solid var(--mo);color:var(--mo)}
+.r .done.ns{border-color:var(--red);color:var(--red);font-size:10px;line-height:1.1;text-align:center}
+.r.past .c{color:var(--mute)}
+</style></head><body><div class="stage">
+
+<!-- ① 今日 -->
+<section class="phone" id="s1">
+ <div class="page">
+  <div class="hd"><span class="m">10月</span><span class="dd">19</span><span class="w">月曜日</span><span class="r">予約 6件<br>確認待ち 2件</span></div>
+  <div class="rows">
+   <div class="r h long"><span class="t">17:00</span><span class="c"><i class="mark mk-bc">B</i>佐藤 一郎<small>眠れるボディケア</small></span></div>
+   <div class="r long"><span class="t">17:15</span><span class="c free">〃</span></div>
+   <div class="r long"><span class="t">17:30</span><span class="c free">〃</span></div>
+   <div class="r long"><span class="t">17:45</span><span class="c free">〃</span></div>
+   <div class="r h"><span class="t">18:00</span><span class="c free">片付け</span></div>
+   <div class="r"><span class="t">18:15</span><span class="c"><i class="mark mk-mo">接</i>鈴木 美咲</span></div>
+   <div class="r"><span class="t">18:30</span><span class="c"><i class="mark mk-mo">接</i>山田 花子<small>はじめて</small></span><span class="hanko">確認<br>待ち</span></div>
+   <div class="r"><span class="t">18:45</span><span class="c free">空き</span></div>
+   <div class="r h"><span class="t">19:00</span><span class="c"><i class="mark mk-mo">接</i>高橋 健太</span></div>
+   <div class="r"><span class="t">19:15</span><span class="c"><i class="mark mk-mo">接</i>伊藤 由美<small>はじめて</small></span><span class="hanko">確認<br>待ち</span></div>
+   <div class="r"><span class="t">19:30</span><span class="c free">空き</span></div>
+   <div class="r"><span class="t">19:45</span><span class="c"><i class="mark mk-mo">接</i>田中 誠</span></div>
+  </div>
+ </div>
+ <div class="fab">＋</div>
+ <div class="tabs"><span class="on">今日</span><span>確認待ち<span class="b">2</span></span><span>休み</span><span>お客さま</span></div>
+</section>
+
+<!-- ② 予約の伝票 -->
+<section class="phone" id="s2">
+ <div class="page">
+  <div class="hd"><span class="m">10月</span><span class="dd">19</span><span class="w">月曜日</span><span class="r">予約 6件<br>確認待ち 2件</span></div>
+  <div class="rows">
+   <div class="r h long"><span class="t">17:00</span><span class="c"><i class="mark mk-bc">B</i>佐藤 一郎</span></div>
+   <div class="r long"><span class="t">17:15</span><span class="c free">〃</span></div>
+   <div class="r long"><span class="t">17:30</span><span class="c free">〃</span></div>
+  </div>
+ </div>
+ <div class="dim"></div>
+ <div class="slip">
+  <div class="ttl"><span>ご予約票</span><span>LINEから　10月16日 11:42 受付</span></div>
+  <div class="stampwrap"><div class="bigstamp">確認<br>待ち</div></div>
+  <h2>山田 花子 様</h2>
+  <div class="kana">ヤマダ ハナコ　・　はじめての方</div>
+  <dl>
+   <div><dt>日時</dt><dd>10月19日（月）18:30〜18:45</dd></div>
+   <div><dt>ご予約先</dt><dd>もみの木接骨院　施術</dd></div>
+   <div><dt>気になる所</dt><dd>腰・ケガ（捻挫・打撲など）</dd></div>
+   <div><dt>電話</dt><dd><span class="tel">090-1234-5678</span></dd></div>
+  </dl>
+  <p class="note">「確定する」を押すと、予約に「確定」のハンコが押され、この方のLINEに確定のお知らせが届きます。</p>
+  <div class="acts">
+   <button class="btn line small">ブロック</button>
+   <button class="btn line">お断り</button>
+   <button class="btn solid"><span class="ic">確</span>確定する</button>
+  </div>
+ </div>
+ <div class="tabs"><span class="on">今日</span><span>確認待ち<span class="b">2</span></span><span>休み</span><span>お客さま</span></div>
+</section>
+
+<!-- ③ 休み（月のページ） -->
+<section class="phone" id="s3">
+ <div class="page">
+  <div class="hd t"><span class="m">2026年</span><h1>11月</h1><span class="r">‹ 10月　　12月 ›</span></div>
+  <div class="hint">日付を押すと「休」のハンコを押せます。祝日も自動では休みになりません。</div>
+  <div class="cal" id="cal"></div>
+  <div class="offl">
+   <h3>これからの休み</h3>
+   <div class="oi"><b>11月5日（木）</b><span>1日休み　研修</span><u>はがす</u></div>
+   <div class="oi"><b>11月16日（月）</b><span>18:30から休み</span><u>はがす</u></div>
+  </div>
+ </div>
+ <div class="tabs"><span>今日</span><span>確認待ち<span class="b">2</span></span><span class="on">休み</span><span>お客さま</span></div>
+</section>
+
+<!-- ④ お客さま（名簿） -->
+<section class="phone" id="s4">
+ <div class="page">
+  <div class="hd t"><h1>お客さま名簿</h1><span class="r">38人</span></div>
+  <div class="srch">名前・フリガナ・電話番号で探す</div>
+  <div class="grp">い</div>
+  <div class="cu"><div class="g"><div class="nm">伊藤 由美</div><div class="sub">次回 10/22（木）17:15　接骨院</div></div><span class="seal new">初</span></div>
+  <div class="grp">さ</div>
+  <div class="cu"><div class="g"><div class="nm">佐藤 一郎</div><div class="sub">次回 10/19（月）17:00　ボディケア</div></div><span class="seal reg">通院中</span></div>
+  <div class="grp">す</div>
+  <div class="cu"><div class="g"><div class="nm">鈴木 美咲</div><div class="sub">前回 10/15（木）　接骨院</div></div><span class="seal reg">通院中</span></div>
+  <div class="grp">た</div>
+  <div class="cu"><div class="g"><div class="nm">高橋 健太</div><div class="sub">前回 10/12（月）　ボディケア</div></div><span class="seal ns">ドタキャン2</span><span class="seal reg">通院中</span></div>
+  <div class="grp">や</div>
+  <div class="cu"><div class="g"><div class="nm">山田 花子</div><div class="sub">次回 10/19（月）18:30　接骨院</div></div><span class="seal new">初</span></div>
+  <div class="grp">その他</div>
+  <div class="cu blocked"><div class="g"><div class="nm">株式会社〇〇 営業部</div><div class="sub">10/10 にブロック</div></div><span class="seal blk">ブロック</span></div>
+ </div>
+ <div class="idx"><span class="on">あ</span><span>か</span><span>さ</span><span>た</span><span>な</span><span>は</span><span>ま</span><span>や</span><span>ら</span><span>わ</span></div>
+ <div class="tabs"><span>今日</span><span>確認待ち<span class="b">2</span></span><span>休み</span><span class="on">お客さま</span></div>
+</section>
+
+
+<!-- ⑤ 終わった予約の結び -->
+<section class="phone" id="s5">
+ <div class="page">
+  <div class="hd"><span class="m">10月</span><span class="dd">15</span><span class="w">木曜日</span><span class="r">予約 5件<br>来院 3・ドタキャン 1</span></div>
+  <div class="rows">
+   <div class="r h past"><span class="t">17:00</span><span class="c"><i class="mark mk-mo">接</i>鈴木 美咲</span><span class="done">来院</span></div>
+   <div class="r past"><span class="t">17:15</span><span class="c"><i class="mark mk-mo">接</i>伊藤 由美</span><span class="done">来院</span></div>
+   <div class="r past"><span class="t">17:30</span><span class="c"><i class="mark mk-mo">接</i>高橋 健太</span><span class="done ns">ドタ<br>キャン</span></div>
+  </div>
+ </div>
+ <div class="dim"></div>
+ <div class="slip">
+  <div class="ttl"><span>ご予約票</span><span>10月15日（木）　終わった予約</span></div>
+  <h2>田中 誠 様</h2>
+  <div class="kana">タナカ マコト　・　通院中</div>
+  <div class="hist"><span>来院 8回</span><span class="bad">ドタキャン 1回</span><span>直前キャンセル 0回</span></div>
+  <dl>
+   <div><dt>日時</dt><dd>10月15日（木）19:45〜20:00</dd></div>
+   <div><dt>ご予約先</dt><dd>もみの木接骨院　施術</dd></div>
+   <div><dt>電話</dt><dd><span class="tel">080-0000-1111</span></dd></div>
+  </dl>
+  <p class="note">この予約はどうでしたか？　押した結果が記録されて、名簿に回数が出ます。押し間違えても付け直せます。</p>
+  <div class="out">
+   <button class="ob come"><i>来院</i>来院した</button>
+   <button class="ob late"><i>直前</i>直前キャンセル</button>
+   <button class="ob ns"><i>ドタ</i>ドタキャン</button>
+  </div>
+ </div>
+ <div class="tabs"><span class="on">今日</span><span>確認待ち<span class="b">2</span></span><span>休み</span><span>お客さま</span></div>
+</section>
+</div>
+<script>
+const cal=document.getElementById("cal");
+let h=["月","火","水","木","金","土","日"].map((w,i)=>`<div class="wd${i==5?" sat":i==6?" sun":""}">${w}</div>`).join("");
+const lead=(new Date(2026,10,1).getDay()+6)%7;
+for(let i=0;i<lead;i++)h+=`<div class="d x"></div>`;
+const cnt={2:5,7:3,9:2,12:4,14:1,19:2,21:1,23:1,26:0,28:0,30:0};
+for(let d=1;d<=30;d++){const wd=(lead+d-1)%7;const open=wd==0||wd==3||wd==5;
+ let inner="";
+ if(d==5)inner=`<span class="st">休</span>`;
+ else if(d==16)inner=`<span class="st half">18:30<br>から休</span>`;
+ else if(open&&cnt[d])inner=`<span class="cnt">予約${cnt[d]}</span>`;
+ h+=`<div class="d${open?"":" x"}">${d}${inner}</div>`;}
+const rest=(7-(lead+30)%7)%7;for(let i=0;i<rest;i++)h+=`<div class="d x"></div>`;
+cal.innerHTML=h;
+</script>
+</body></html>

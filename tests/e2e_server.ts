@@ -19,6 +19,12 @@ Deno.serve({ port: 8765 }, async (req) => {
       return Response.json({ error: "server_error" }, { status: 500 });
     }
   }
+  if (u.pathname.startsWith("/__font/")) {
+    const w = u.pathname.split("/").pop();
+    const f = new URL(`../mock/node_modules/@fontsource/zen-maru-gothic/files/zen-maru-gothic-japanese-${w}-normal.woff2`, import.meta.url);
+    try { return new Response(await Deno.readFile(f), { headers: { "content-type": "font/woff2", "access-control-allow-origin": "*" } }); }
+    catch { return new Response("", { status: 404 }); }
+  }
   const path = u.pathname === "/" ? "index.html" : u.pathname.slice(1);
   try {
     const body = await Deno.readFile(new URL(path, root));
