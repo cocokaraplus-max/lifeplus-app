@@ -325,6 +325,29 @@
     };
   }
 
+  // ---------- 文字の大きさ（この端末に覚えておく） ----------
+  function applySize(z) {
+    var root = document.documentElement.style;
+    root.setProperty("--text-zoom", String(z));
+    root.setProperty("--time-cols", z >= 1.4 ? "2" : z >= 1.2 ? "3" : "4");
+    Array.prototype.forEach.call(document.querySelectorAll("[data-size]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-size") === String(z)));
+    });
+  }
+  (function () {
+    var z = 1;
+    try { z = Number(localStorage.getItem("lp_text_zoom")) || 1; } catch (_) { /* 何もしない */ }
+    if ([1, 1.2, 1.4].indexOf(z) < 0) z = 1;
+    applySize(z);
+    Array.prototype.forEach.call(document.querySelectorAll("[data-size]"), function (b) {
+      b.onclick = function () {
+        var v = Number(b.getAttribute("data-size"));
+        applySize(v);
+        try { localStorage.setItem("lp_text_zoom", String(v)); } catch (_) { /* 何もしない */ }
+      };
+    });
+  })();
+
   // ---------- 起動 ----------
   function boot() {
     if (!window.liff || !CFG.LIFF_ID) { view('<div class="card">ページの準備ができていません。</div>'); return; }
