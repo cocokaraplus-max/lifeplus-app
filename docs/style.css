@@ -146,3 +146,10 @@ label.f input:focus { outline: none; border-color: var(--blue); }
 .notice { background: #fff8e6; border: 2px solid #f2b705; color: #4a3800; border-radius: 12px; padding: 12px 14px; margin: 0 0 14px; font-size: 15px; line-height: 1.6; }
 .notice b { display: block; font-size: 15px; margin-bottom: 2px; }
 .notice .ex { display: block; font-size: 14px; margin-top: 4px; }
+
+/* 2行に割れにくく（文節で折り返す・見出しは行をそろえる） marker: onelines-v1 */
+body { word-break: auto-phrase; text-wrap: pretty; }
+h2, .brand-title, .choice .name { text-wrap: balance; }
+.namerow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.link { background: none; border: 0; color: var(--blue); font-weight: 700; font-size: 15px; text-decoration: underline;
+  text-underline-offset: 3px; padding: 6px 0; cursor: pointer; white-space: nowrap; }

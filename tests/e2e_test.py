@@ -33,7 +33,7 @@ with sync_playwright() as p:
     b = p.chromium.launch()
     ctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, locale="ja-JP")
     ctx.route("https://static.line-scdn.net/**", lambda r: r.fulfill(body=FAKE_LIFF, content_type="text/javascript"))
-    ctx.route("**/config.js", lambda r: r.fulfill(body=CONFIG, content_type="text/javascript"))
+    ctx.route("**/config.js*", lambda r: r.fulfill(body=CONFIG, content_type="text/javascript"))
     FONT = "".join(f"@font-face{{font-family:'Zen Maru Gothic';font-weight:{w};src:url(http://127.0.0.1:8765/__font/{w})}}" for w in (500,700,900))
     ctx.route("https://fonts.googleapis.com/**", lambda r: r.fulfill(body=FONT, content_type="text/css"))
     pg = ctx.new_page()
@@ -71,6 +71,13 @@ with sync_playwright() as p:
     check("確認画面に料金8,000円", pg.get_by_text("8,000円").is_visible())
     check("ボディケアには保険のご案内を出さない", pg.locator(".notice").count() == 0)
     pg.screenshot(path=f"{SHOTS}/07_confirm.png")
+    # 確認画面から名前を変えられる
+    pg.get_by_role("button", name="変更する").click()
+    expect(pg.get_by_role("button", name="保存する")).to_be_visible()
+    pg.fill("#pn", "本番 花子")
+    pg.get_by_role("button", name="保存する").click()
+    expect(pg.get_by_role("heading", name="この内容で予約しますか？")).to_be_visible()
+    check("確認画面で名前を変えられる", pg.get_by_text("本番 花子 様").is_visible())
     pg.get_by_role("button", name="予約する").click()
     expect(pg.get_by_role("heading", name="仮予約を受け付けました")).to_be_visible()
     pg.screenshot(path=f"{SHOTS}/08_done.png")
@@ -84,7 +91,7 @@ with sync_playwright() as p:
     expect(pg.get_by_role("heading", name="ご希望の日時をお選びください")).to_be_visible()
     first = pg.locator(".day", has_text="10月19日").locator(".time").first.inner_text()
     check("接骨院の月曜の最初の枠は18:15（ボディケア＋片付けの後）", first == "18:15")
-    check("接骨院の日時の画面に保険のご案内", pg.get_by_text("ケガ以外の症状は保険外となりますのでご了承ください。").is_visible())
+    check("接骨院の日時の画面に保険のご案内", pg.locator(".notice", has_text="ケガ以外の症状は保険外となりますので").is_visible())
 
     # 3. 選んでいるあいだに別の人が同じ時間を取った → 案内して時間を選び直し
     api("p2", "profile", name="別の人", nameKana="ベツノヒト", phone="0565111111")

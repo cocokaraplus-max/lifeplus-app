@@ -1,4 +1,4 @@
-/* LIFE PLUS 予約ページ（LIFF）  marker: lifeplus-liff-v1 / techo-v1
+/* LIFE PLUS 予約ページ（LIFF）  marker: lifeplus-liff-v1 / techo-v1 / onelines-v1
    流れ：ホーム（自分の予約）→ 事業 → メニュー → 日時 → 症状 → 確認 → 完了
    予約・取消・登録はすべて関所（API_URL）を通す。ページ側は何も決めない。 */
 (function () {
@@ -20,8 +20,8 @@
   // 接骨院の保険についてのお知らせ（marker: mominoki-insurance-note-v1）
   var MOMINOKI_NOTE =
     '<div class="notice" role="note"><b>保険についてのご案内</b>' +
-    "ケガ以外の症状は保険外となりますのでご了承ください。" +
-    '<span class="ex">（保険が適応されない例：肩こり、腰痛、慢性痛、疲労、繰り返しの動作で発生した痛み）</span></div>';
+    "ケガ以外の症状は保険外となりますので<br>ご了承ください。" +
+    '<span class="ex">（保険が適応されない例：<br>肩こり、腰痛、慢性痛、疲労、<br>繰り返しの動作で発生した痛み）</span></div>';
   function mominokiNote() { return S.business && S.business.id === "mominoki" ? MOMINOKI_NOTE : ""; }
 
   var ERR = {
@@ -112,7 +112,7 @@
           '<div class="when">' + md(b.date) + "（" + esc(b.weekday) + "）" + esc(b.time) + "〜</div>" +
           '<span class="badge ' + esc(b.status) + '">' + (b.status === "confirmed" ? "確定" : "確認<br>待ち") + "</span>" +
           '<div class="what">' + esc(b.businessName) + "　" + esc(b.menuName) + "</div>" +
-          (b.status === "pending" ? '<div class="what">内容を確認して、LINEで確定のご連絡をします。</div>' : "") +
+          (b.status === "pending" ? '<div class="what">確定したらLINEでお知らせします。</div>' : "") +
           '<div class="actions"><button class="btn danger" data-cancel="' + esc(b.id) + '">このご予約を取り消す</button></div>' +
           "</div>";
       });
@@ -146,17 +146,19 @@
     view(
       '<button class="back" id="back">← もどる</button>' +
       "<h2>お名前とご連絡先</h2>" +
-      '<p class="lead">ご予約の確認のために使います。ほかの目的には使いません。</p>' +
+      '<p class="lead">ご予約の確認にだけ使います。</p>' +
       '<div class="card">' +
       '<p class="err" id="perr" hidden></p>' +
       '<label class="f"><span>お名前</span><input id="pn" autocomplete="name" maxlength="30" value="' + esc(p.name) + '" placeholder="山田 花子"></label>' +
       '<label class="f"><span>フリガナ</span><input id="pk" maxlength="40" value="' + esc(p.nameKana) + '" placeholder="ヤマダ ハナコ"></label>' +
       '<label class="f"><span>お電話番号</span><input id="pp" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" value="' + esc(p.phone) + '" placeholder="090-1234-5678"></label>' +
-      '<p class="note">こちらからお電話することは、急ぎのご連絡のときだけです。</p>' +
-      '<button class="btn" id="save">登録して進む</button>' +
+      '<p class="note">お電話は急ぎのときだけおかけします。</p>' +
+      '<button class="btn" id="save">' + (p.complete ? "保存する" : "登録して進む") + '</button>' +
       "</div>"
     );
-    document.getElementById("back").onclick = function () { home(); };
+    document.getElementById("back").onclick = function () {
+      var back = (p.complete && S.afterProfile) || home; S.afterProfile = null; back();
+    };
     document.getElementById("save").onclick = function () {
       var btn = this; btn.disabled = true;
       api("profile", {
@@ -164,8 +166,10 @@
         nameKana: document.getElementById("pk").value,
         phone: document.getElementById("pp").value,
       }).then(function (r) {
+        var changed = p.complete;
         S.data.profile = r.profile;
         var next = S.afterProfile || home; S.afterProfile = null; next();
+        if (changed) toast("お名前・お電話番号を変更しました。");
       }, function (e) {
         btn.disabled = false;
         var code = fail(e);
@@ -268,7 +272,7 @@
   function chooseSymptoms() {
     var h = '<button class="back" id="back">← もどる</button>' + steps(4) +
       "<h2>気になるところはどこですか？</h2>" +
-      '<p class="lead">あてはまるものを選んでください（いくつでも・選ばなくても大丈夫です）。</p>' +
+      '<p class="lead">いくつでも選べます。<br>選ばなくても大丈夫です。</p>' +
       '<div class="card"><div class="chips">';
     S.data.symptoms.forEach(function (s) {
       h += '<button class="chip' + (S.symptoms.indexOf(s) >= 0 ? " on" : "") + '" data-sym="' + esc(s) + '" aria-pressed="' + (S.symptoms.indexOf(s) >= 0) + '">' + esc(s) + "</button>";
@@ -297,14 +301,15 @@
       "<dt>日時</dt><dd>" + md(S.slot.date) + "（" + esc(S.slot.weekday) + "）" + esc(S.slot.time) + "〜</dd>" +
       "<dt>料金</dt><dd>" + yen(S.menu.priceYen) + "</dd>" +
       (S.symptoms.length ? "<dt>気になる所</dt><dd>" + esc(S.symptoms.join("・")) + "</dd>" : "") +
-      "<dt>お名前</dt><dd>" + esc(p.name) + " 様</dd>" +
+      '<dt>お名前</dt><dd class="namerow"><span>' + esc(p.name) + ' 様</span><button class="link" id="chg">変更する</button></dd>' +
       "</dl></div>" +
       (p.isReturning ? "" : p.noShowHold
-        ? '<div class="info">これまでのご予約の日に、ご来院がなかったことが続いたため、今回は「仮予約」でお預かりします。内容を確認して、LINEで確定のご連絡をします。</div>'
-        : '<div class="info">初めての方は「仮予約」になります。内容を確認して、LINEで確定のご連絡をします。</div>') +
+        ? '<div class="info">ご来院のない予約が続いたため、<br>今回は「仮予約」でお預かりします。<br>確定したらLINEでお知らせします。</div>'
+        : '<div class="info">初めての方は「仮予約」になります。<br>確定したらLINEでお知らせします。</div>') +
       '<button class="btn" id="book">予約する</button>';
     view(h);
     document.getElementById("back").onclick = function () { chooseSymptoms(); };
+    document.getElementById("chg").onclick = function () { S.afterProfile = confirmView; profile(); };
     document.getElementById("book").onclick = function () {
       var btn = this; btn.disabled = true; btn.textContent = "送っています…";
       api("book", { menuId: S.menu.id, startsAt: S.slot.startsAt, symptoms: S.symptoms }).then(function (r) {
@@ -324,7 +329,7 @@
       '<div class="ok-mark' + (ok ? " confirmed" : "") + '" aria-hidden="true"></div>' +
       "<h2>" + (ok ? "ご予約が確定しました" : "仮予約を受け付けました") + "</h2>" +
       (b ? "<p><b>" + md(b.date) + "（" + esc(b.weekday) + "）" + esc(b.time) + "〜</b><br>" + esc(b.businessName) + "　" + esc(b.menuName) + "</p>" : "") +
-      (ok ? "<p>当日お待ちしております。</p>" : "<p>内容を確認して、LINEで確定のご連絡をします。<br>もうしばらくお待ちください。</p>") +
+      (ok ? "<p>当日お待ちしております。</p>" : "<p>確定したらLINEでお知らせします。<br>もうしばらくお待ちください。</p>") +
       "</div>" +
       '<button class="btn" id="close">' + (liff.isInClient() ? "閉じる" : "ご予約の状況へ") + "</button>";
     view(h);
