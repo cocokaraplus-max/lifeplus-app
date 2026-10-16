@@ -291,7 +291,9 @@
       (S.symptoms.length ? "<dt>気になる所</dt><dd>" + esc(S.symptoms.join("・")) + "</dd>" : "") +
       "<dt>お名前</dt><dd>" + esc(p.name) + " 様</dd>" +
       "</dl></div>" +
-      (p.isReturning ? "" : '<div class="info">初めての方は「仮予約」になります。内容を確認して、LINEで確定のご連絡をします。</div>') +
+      (p.isReturning ? "" : p.noShowHold
+        ? '<div class="info">これまでのご予約の日に、ご来院がなかったことが続いたため、今回は「仮予約」でお預かりします。内容を確認して、LINEで確定のご連絡をします。</div>'
+        : '<div class="info">初めての方は「仮予約」になります。内容を確認して、LINEで確定のご連絡をします。</div>') +
       '<button class="btn" id="book">予約する</button>';
     view(h);
     document.getElementById("back").onclick = function () { chooseSymptoms(); };

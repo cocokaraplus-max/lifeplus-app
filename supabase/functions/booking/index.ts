@@ -1,6 +1,6 @@
 // =============================================================
 // LIFE PLUS 予約  関所（Supabase Edge Function: booking）
-// marker: lifeplus-booking-fn-v1
+// marker: lifeplus-booking-fn-v1 / admin-notify-v1
 //
 // 予約ページ（LIFF）からの依頼は、すべてここを通る。
 //   1. LINE の ID トークンを LINE 本体に問い合わせて、本人を確かめる
@@ -39,6 +39,8 @@ export interface Deps {
   sql: Sql;
   verifyIdToken: (token: string) => Promise<{ sub: string; name?: string } | null>;
   now?: () => Date;
+  // HIROさんの LINE へ知らせる（失敗しても予約は止めない）
+  notify?: (to: string[], text: string) => Promise<void>;
 }
 
 // ---------- 日付（日本時間） ----------
@@ -87,14 +89,40 @@ async function getOrCreateCustomer(sql: Sql, who: { sub: string; name?: string }
   return rows[0];
 }
 
-function profileOf(c: { name: string | null; name_kana: string | null; phone: string | null; is_returning: boolean }) {
+function profileOf(
+  c: { name: string | null; name_kana: string | null; phone: string | null; is_returning: boolean },
+  hold = false,
+) {
   return {
     name: c.name ?? "",
     nameKana: c.name_kana ?? "",
     phone: c.phone ?? "",
     complete: !!(c.name && c.name_kana && c.phone),
-    isReturning: c.is_returning,
+    // 確定で入るかどうか（通院中で、ドタキャンが続いていない）
+    isReturning: c.is_returning && !hold,
+    // ドタキャンが続いたため仮予約になる
+    noShowHold: hold,
   };
+}
+
+async function holdOf(sql: Sql, customerId: string): Promise<boolean> {
+  const r = await sql`select lp_noshow_hold(${customerId}::uuid) as h`;
+  return !!r[0].h;
+}
+
+async function adminIds(sql: Sql): Promise<string[]> {
+  const r = await sql`select value from app_settings where key = 'admin_line_user_ids'`;
+  return String(r[0]?.value ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+}
+
+async function tellAdmin(deps: Deps, text: string) {
+  if (!deps.notify) return;
+  try {
+    const to = await adminIds(deps.sql);
+    if (to.length) await deps.notify(to, text);
+  } catch (e) {
+    console.error("notify failed", e);
+  }
 }
 
 async function settings(sql: Sql) {
@@ -162,7 +190,7 @@ export async function handle(body: any, deps: Deps): Promise<Record<string, unkn
         where m.is_active and b.accepts_booking
         order by b.sort_order, m.sort_order`;
       return {
-        profile: profileOf(cust),
+        profile: profileOf(cust, await holdOf(sql, cust.id)),
         businesses: businesses.map((b: Record<string, unknown>) => ({ id: b.id, name: b.name, color: b.color })),
         menus: menus.map((m: Record<string, unknown>) => ({
           id: m.id, businessId: m.business_id, name: m.name, description: m.description,
@@ -186,7 +214,7 @@ export async function handle(body: any, deps: Deps): Promise<Record<string, unkn
         update customers set name = ${name}, name_kana = ${kana}, phone = ${phone}
         where id = ${cust.id}
         returning id, name, name_kana, phone, is_returning, is_blocked`;
-      return { profile: profileOf(rows[0]) };
+      return { profile: profileOf(rows[0], await holdOf(sql, cust.id)) };
     }
 
     // 空き枠：from から14日ぶん（受付のある曜日だけ）
@@ -261,7 +289,15 @@ export async function handle(body: any, deps: Deps): Promise<Record<string, unkn
         throw e;
       }
       const mine = await myBookings(sql, cust.id, now);
-      return { booking: mine.find((b: { id: unknown }) => b.id === id) ?? null, bookings: mine };
+      const bk = mine.find((b: { id: unknown }) => b.id === id) ?? null;
+      if (bk) {
+        const hold = await holdOf(sql, cust.id);
+        const head = bk.status === "confirmed" ? "【予約が入りました】" : "【確認待ちの仮予約】";
+        const why = bk.status === "confirmed" ? "" : hold ? "\n※ドタキャンが続いている方です" : "\n※はじめての方です";
+        await tellAdmin(deps,
+          `${head}\n${bk.date.slice(5).replace("-", "/")}（${bk.weekday}）${bk.time}〜\n${bk.businessName}　${bk.menuName}\n${cust.name} 様${why}`);
+      }
+      return { booking: bk, bookings: mine };
     }
 
     // 取り消す（締め切りまで）
@@ -276,6 +312,15 @@ export async function handle(body: any, deps: Deps): Promise<Record<string, unkn
           and status in ('pending','confirmed')
           and starts_at >= ${limit}::timestamptz
         returning id`;
+      if (rows.length) {
+        const b = await sql`
+          select b.starts_at, m.name as menu_name from bookings b join menus m on m.id = b.menu_id
+          where b.id = ${id}::uuid`;
+        const s = b[0].starts_at as Date;
+        const d = jstDate(s);
+        await tellAdmin(deps,
+          `【予約の取り消し】\n${d.slice(5).replace("-", "/")}（${WEEKDAYS[new Date(d + "T00:00:00Z").getUTCDay()]}）${jstTime(s)}〜\n${b[0].menu_name}\n${cust.name} 様`);
+      }
       if (!rows.length) {
         const exists = await sql`
           select 1 from bookings where id = ${id}::uuid and customer_id = ${cust.id}
@@ -309,6 +354,19 @@ if (DenoRT && DenoRT.env?.get("SUPABASE_DB_URL")) {
     return { sub: String(j.sub), name: typeof j.name === "string" ? j.name : undefined };
   };
 
+  const LINE_TOKEN = DenoRT.env.get("LINE_MESSAGING_TOKEN") ?? "";
+  const notify = async (to: string[], text: string) => {
+    if (!LINE_TOKEN) return;
+    for (const id of to) {
+      const r = await fetch("https://api.line.me/v2/bot/message/push", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${LINE_TOKEN}` },
+        body: JSON.stringify({ to: id, messages: [{ type: "text", text: text.slice(0, 4900) }] }),
+      });
+      if (!r.ok) console.error("line push", r.status, await r.text());
+    }
+  };
+
   const cors = {
     "access-control-allow-origin": "*",
     "access-control-allow-headers": "content-type, authorization, apikey, x-client-info",
@@ -325,7 +383,7 @@ if (DenoRT && DenoRT.env?.get("SUPABASE_DB_URL")) {
       return Response.json({ error: "bad_request" }, { status: 400, headers: cors });
     }
     try {
-      const out = await handle(body, { sql, verifyIdToken });
+      const out = await handle(body, { sql, verifyIdToken, notify });
       return Response.json(out, { headers: cors });
     } catch (e) {
       if (e instanceof ApiError) return Response.json({ error: e.code }, { status: e.status, headers: cors });

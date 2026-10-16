@@ -9,7 +9,9 @@ const sql = postgres(Deno.env.get("TEST_DB_URL")!, { prepare: false, max: 2, onn
 const verifyIdToken = (t: string) =>
   Promise.resolve(t.startsWith("tok-") ? { sub: "U" + t.slice(4), name: "LINE太郎" } : null);
 const NOW = new Date("2026-10-16T12:00:00+09:00");
-const call = (body: Record<string, unknown>) => handle(body, { sql, verifyIdToken, now: () => NOW });
+const sent: { to: string[]; text: string }[] = [];
+const notify = (to: string[], text: string) => { sent.push({ to, text }); return Promise.resolve(); };
+const call = (body: Record<string, unknown>) => handle(body, { sql, verifyIdToken, now: () => NOW, notify });
 const code = async (p: Promise<unknown>) => {
   try { await p; return "ok"; } catch (e) { return e instanceof ApiError ? e.code : String(e); }
 };
@@ -19,6 +21,7 @@ const menu = (n: string) => menus.find((m) => m.name === n).id;
 
 Deno.test({ name: "関所", sanitizeOps: false, sanitizeResources: false, fn: async (t) => {
   await sql`delete from bookings`; await sql`delete from customers`; await sql`delete from closures`;
+  await sql`update app_settings set value = '' where key = 'admin_line_user_ids'`;
 
   await t.step("偽物のトークン・トークンなしは通さない", async () => {
     assertEquals(await code(call({ action: "init", idToken: "fake" })), "token_invalid");
@@ -130,6 +133,57 @@ Deno.test({ name: "関所", sanitizeOps: false, sanitizeResources: false, fn: as
     assertEquals(await code(call({ action: "book", idToken: "tok-new", menuId: menu("施術（保険）"), startsAt: "あした" })), "slot_not_available");
     assertEquals(await code(call({ action: "hack", idToken: "tok-new" })), "bad_request");
     await assertRejects(() => handle(null, { sql, verifyIdToken }));
+  });
+
+  await t.step("HIROさんのLINEに知らせが届く（登録前は届かない）", async () => {
+    await sql`delete from bookings where customer_id = (select id from customers where line_user_id = 'Uold')`;
+    sent.length = 0;
+    await call({ action: "book", idToken: "tok-old", menuId: menu("施術（保険）"), startsAt: "2026-10-26T18:00:00+09:00" });
+    assertEquals(sent.length, 0);
+    await sql`update app_settings set value = 'Uhiro' where key = 'admin_line_user_ids'`;
+    await call({ action: "book", idToken: "tok-old", menuId: menu("施術（保険）"), startsAt: "2026-10-29T18:00:00+09:00" });
+    assertEquals(sent.length, 1);
+    assertEquals(sent[0].to, ["Uhiro"]);
+    assertEquals(sent[0].text.startsWith("【予約が入りました】\n10/29（木）18:00〜"), true);
+  });
+
+  await t.step("ドタキャンが2回続いたら、通院中でも仮予約。理由が画面に出る", async () => {
+    await sql`delete from bookings where customer_id = (select id from customers where line_user_id = 'Uold')`;
+    const cid = (await sql`select id from customers where line_user_id = 'Uold'`)[0].id;
+    const mid = menu("施術（保険）");
+    const past = async (ts: string, st: string) => {
+      await sql`insert into bookings (customer_id, menu_id, business_id, starts_at, ends_at, block_until, status)
+        values (${cid}, ${mid}, 'mominoki', ${ts}::timestamptz, ${ts}::timestamptz + interval '15 min', ${ts}::timestamptz + interval '15 min', ${st})`;
+    };
+    await past("2026-10-01T17:00:00+09:00", "done");
+    await past("2026-10-05T17:00:00+09:00", "no_show");
+    let r = await call({ action: "init", idToken: "tok-old" });
+    assertEquals((r.profile as { noShowHold: boolean }).noShowHold, false);   // 1回だけなら続いていない
+    await past("2026-10-08T17:00:00+09:00", "late_cancel");                   // 直前キャンセルは数えない
+    await past("2026-10-12T17:00:00+09:00", "no_show");
+    r = await call({ action: "init", idToken: "tok-old" });
+    const p = r.profile as { noShowHold: boolean; isReturning: boolean };
+    assertEquals([p.noShowHold, p.isReturning], [true, false]);
+    sent.length = 0;
+    const b = await call({ action: "book", idToken: "tok-old", menuId: mid, startsAt: "2026-10-31T09:00:00+09:00" });
+    assertEquals((b.booking as { status: string }).status, "pending");
+    assertEquals(sent[0].text.includes("ドタキャンが続いている方"), true);
+  });
+
+  await t.step("来院が1回入れば、続きは切れて確定に戻る", async () => {
+    const cid = (await sql`select id from customers where line_user_id = 'Uold'`)[0].id;
+    await sql`insert into bookings (customer_id, menu_id, business_id, starts_at, ends_at, block_until, status)
+      values (${cid}, ${menu("施術（保険）")}, 'mominoki', '2026-10-15T17:00:00+09:00', '2026-10-15T17:15:00+09:00', '2026-10-15T17:15:00+09:00', 'done')`;
+    const r = await call({ action: "init", idToken: "tok-old" });
+    assertEquals((r.profile as { isReturning: boolean }).isReturning, true);
+  });
+
+  await t.step("取り消しもHIROさんに知らせる", async () => {
+    sent.length = 0;
+    const mine = (await call({ action: "init", idToken: "tok-old" })).bookings as { id: string; startsAt: string }[];
+    const target = mine.find((x) => x.startsAt.startsWith("2026-10-31"))!;
+    await call({ action: "cancel", idToken: "tok-old", bookingId: target.id });
+    assertEquals(sent[0].text.startsWith("【予約の取り消し】\n10/31（土）09:00〜"), true);
   });
 
   await t.step("入力の整え", () => {
