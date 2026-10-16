@@ -1,6 +1,6 @@
 // =============================================================
 // LIFE PLUS 予約  関所（Supabase Edge Function: booking）
-// marker: lifeplus-booking-fn-v1 / admin-notify-v1 / notify-contact-v1
+// marker: lifeplus-booking-fn-v1 / admin-notify-v1 / notify-contact-v1 / admin-api-v1
 //
 // 予約ページ（LIFF）からの依頼は、すべてここを通る。
 //   1. LINE の ID トークンを LINE 本体に問い合わせて、本人を確かめる
@@ -39,7 +39,7 @@ export interface Deps {
   sql: Sql;
   verifyIdToken: (token: string) => Promise<{ sub: string; name?: string } | null>;
   now?: () => Date;
-  // HIROさんの LINE へ知らせる（失敗しても予約は止めない）
+  // HIROさん・患者さんの LINE へ送る（失敗しても予約は止めない）
   notify?: (to: string[], text: string) => Promise<void>;
 }
 
@@ -184,6 +184,13 @@ export async function handle(body: any, deps: Deps): Promise<Record<string, unkn
   const who = await deps.verifyIdToken(token);
   if (!who || !who.sub) throw new ApiError("token_invalid", 401);
 
+  // 管理画面（HIROさんだけ）
+  if (typeof body.action === "string" && body.action.startsWith("admin_")) {
+    const ids = await adminIds(sql);
+    if (!ids.includes(who.sub)) throw new ApiError("not_admin", 403);
+    return await handleAdmin(body, deps, now);
+  }
+
   const cust = await getOrCreateCustomer(sql, who);
   if (cust.is_blocked) throw new ApiError("customer_blocked", 403);
 
@@ -264,6 +271,51 @@ export async function handle(body: any, deps: Deps): Promise<Record<string, unkn
       return { from, days, next: next <= last ? next : null, prev };
     }
 
+    // ひと月のカレンダー（日ごとの空き数）  marker: month-calendar-v1
+    case "month": {
+      const menuId = str(body.menuId, 40);
+      if (!UUID_RE.test(menuId)) throw new ApiError("menu_not_found");
+      const today = jstDate(now);
+      let ym = str(body.month, 7);
+      if (!/^\d{4}-\d{2}$/.test(ym) || ym < today.slice(0, 7)) ym = today.slice(0, 7);
+      const st = await settings(sql);
+      const last = addDays(today, st.horizonDays);
+      if (ym > last.slice(0, 7)) ym = last.slice(0, 7);
+      const hours = await sql`select distinct weekday from business_hours`;
+      const openW = new Set(hours.map((h: Record<string, unknown>) => Number(h.weekday)));
+      const first = ym + "-01";
+      const days = [];
+      for (let d = first; d.slice(0, 7) === ym; d = addDays(d, 1)) {
+        let state = "off"; let count = 0;
+        if (d < today || d > last) state = "out";
+        else if (openW.has(isoWeekday(d))) {
+          const r = await sql`select count(*)::int as n from lp_available_slots(${d}::date, ${menuId}::uuid)`;
+          count = r[0].n;
+          const anyHours = await sql`select 1 from closures where tstzrange(starts_at, ends_at, '[)') @> tstzrange(${d + "T00:00:00+09:00"}::timestamptz, ${addDays(d, 1) + "T00:00:00+09:00"}::timestamptz, '[)') limit 1`;
+          state = anyHours.length ? "off" : count === 0 ? "full" : count <= 2 ? "few" : "open";
+        }
+        days.push({ date: d, day: Number(d.slice(8)), weekday: WEEKDAYS[isoWeekday(d) % 7], state, count });
+      }
+      const prevM = addDays(first, -1).slice(0, 7);
+      const nextM = addDays(addDays(first, 31).slice(0, 7) + "-01", 0).slice(0, 7);
+      return {
+        month: ym, label: `${Number(ym.slice(0, 4))}年${Number(ym.slice(5))}月`, lead: isoWeekday(first) % 7, days,
+        prev: prevM >= today.slice(0, 7) ? prevM : null, next: nextM <= last.slice(0, 7) ? nextM : null,
+      };
+    }
+
+    // その日の時間
+    case "slots": {
+      const menuId = str(body.menuId, 40), d = str(body.date, 10);
+      if (!UUID_RE.test(menuId)) throw new ApiError("menu_not_found");
+      if (!DATE_RE.test(d)) throw new ApiError("bad_request");
+      const rows = await sql`select starts_at from lp_available_slots(${d}::date, ${menuId}::uuid)`;
+      return {
+        date: d, weekday: WEEKDAYS[isoWeekday(d) % 7],
+        slots: rows.map((r: Record<string, unknown>) => ({ startsAt: (r.starts_at as Date).toISOString(), time: jstTime(r.starts_at as Date) })),
+      };
+    }
+
     // 予約する
     case "book": {
       if (!profileOf(cust).complete) throw new ApiError("profile_required");
@@ -336,6 +388,303 @@ export async function handle(body: any, deps: Deps): Promise<Record<string, unkn
         throw new ApiError(exists.length ? "cancel_too_late" : "booking_not_found");
       }
       return { bookings: await myBookings(sql, cust.id, now) };
+    }
+
+    default:
+      throw new ApiError("bad_request");
+  }
+}
+
+
+// =============================================================
+// 管理画面（HIROさんだけ）  marker: admin-api-v1
+// =============================================================
+function md(d: string) { return `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`; }
+function whenText(s: Date) {
+  const d = jstDate(s);
+  return `${md(d)}（${WEEKDAYS[new Date(d + "T00:00:00Z").getUTCDay()]}）${jstTime(s)}〜`;
+}
+async function tellPatient(deps: Deps, lineUserId: string | null, text: string): Promise<boolean> {
+  if (!deps.notify || !lineUserId) return false;
+  try { await deps.notify([lineUserId], text); return true; } catch (e) { console.error("patient push", e); return false; }
+}
+const TAIL = "\nご質問はこのトークにご返信ください。";
+
+// deno-lint-ignore no-explicit-any
+function bookingRow(r: any) {
+  const s = r.starts_at as Date;
+  return {
+    id: r.id, startsAt: s.toISOString(), date: jstDate(s), time: jstTime(s),
+    endTime: jstTime(r.ends_at as Date), blockUntil: jstTime(r.block_until as Date),
+    status: r.status, businessId: r.business_id, menuName: r.menu_name, durationMin: r.duration_min,
+    priceYen: r.price_yen, symptoms: r.symptoms ?? [], source: r.source, outcomeNote: r.outcome_note,
+    createdAt: (r.created_at as Date)?.toISOString?.() ?? null,
+    customer: {
+      id: r.customer_id, name: r.c_name ?? "", kana: r.c_kana ?? "", phone: r.c_phone ?? "", lineName: r.c_line_name ?? "",
+      hasLine: !!r.c_line, isReturning: !!r.c_returning, isBlocked: !!r.c_blocked,
+      visits: Number(r.visits ?? 0), noShows: Number(r.no_shows ?? 0), lateCancels: Number(r.late_cancels ?? 0),
+    },
+  };
+}
+// deno-lint-ignore no-explicit-any
+async function bookingsWhere(sql: Sql, where: any) {
+  const rows = await sql`
+    select b.*, m.name as menu_name, m.duration_min,
+           c.name as c_name, c.name_kana as c_kana, c.phone as c_phone, c.line_name as c_line_name,
+           c.line_user_id as c_line, c.is_returning as c_returning, c.is_blocked as c_blocked,
+           st.visits, st.no_shows, st.late_cancels
+    from bookings b
+    join menus m on m.id = b.menu_id
+    join customers c on c.id = b.customer_id
+    left join customer_stats st on st.customer_id = c.id
+    where ${where}
+    order by b.starts_at`;
+  return rows.map(bookingRow);
+}
+async function bookingFull(sql: Sql, id: string) {
+  const r = await sql`
+    select b.*, m.name as menu_name, bz.name as business_name, c.line_user_id, c.name as c_name
+    from bookings b join menus m on m.id = b.menu_id join businesses bz on bz.id = b.business_id
+    join customers c on c.id = b.customer_id where b.id = ${id}::uuid`;
+  if (!r.length) throw new ApiError("booking_not_found", 404);
+  return r[0];
+}
+function dayRange(d: string) {
+  const start = new Date(Date.parse(d + "T00:00:00+09:00")).toISOString();
+  const end = new Date(Date.parse(d + "T00:00:00+09:00") + 86400000).toISOString();
+  return { start, end };
+}
+
+// deno-lint-ignore no-explicit-any
+async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<string, unknown>> {
+  const { sql } = deps;
+  switch (body.action) {
+    case "admin_init": {
+      const businesses = await sql`select id, name, color from businesses where accepts_booking order by sort_order`;
+      const menus = await sql`
+        select m.id, m.business_id, m.name, m.duration_min, m.buffer_after_min, m.price_yen
+        from menus m join businesses b on b.id = m.business_id where m.is_active and b.accepts_booking
+        order by b.sort_order, m.sort_order`;
+      const hours = await sql`select weekday, to_char(open_time,'HH24:MI') as o, to_char(close_time,'HH24:MI') as c from business_hours order by weekday, open_time`;
+      const pend = await sql`select count(*)::int as n from bookings where status = 'pending' and ends_at > ${now.toISOString()}::timestamptz`;
+      return {
+        today: jstDate(now),
+        businesses: businesses.map((b: Record<string, unknown>) => ({ id: b.id, name: b.name })),
+        menus: menus.map((m: Record<string, unknown>) => ({ id: m.id, businessId: m.business_id, name: m.name, durationMin: m.duration_min, bufferMin: m.buffer_after_min, priceYen: m.price_yen })),
+        hours: hours.map((h: Record<string, unknown>) => ({ weekday: Number(h.weekday), open: h.o, close: h.c })),
+        pendingCount: pend[0].n,
+        symptoms: SYMPTOMS,
+      };
+    }
+
+    case "admin_day": {
+      const d = str(body.date, 10);
+      if (!DATE_RE.test(d)) throw new ApiError("bad_request");
+      const { start, end } = dayRange(d);
+      const list = await bookingsWhere(sql, sql`b.starts_at >= ${start}::timestamptz and b.starts_at < ${end}::timestamptz and b.status not in ('cancelled','rejected')`);
+      const closures = await sql`
+        select id, starts_at, ends_at, note from closures
+        where tstzrange(starts_at, ends_at, '[)') && tstzrange(${start}::timestamptz, ${end}::timestamptz, '[)') order by starts_at`;
+      const hours = await sql`select to_char(open_time,'HH24:MI') as o, to_char(close_time,'HH24:MI') as c from business_hours where weekday = ${isoWeekday(d)} order by open_time`;
+      const pend = await sql`select count(*)::int as n from bookings where status = 'pending' and ends_at > ${now.toISOString()}::timestamptz`;
+      return {
+        date: d, weekday: WEEKDAYS[isoWeekday(d) % 7], bookings: list,
+        closures: closures.map((c: Record<string, unknown>) => ({ id: c.id, from: jstTime(c.starts_at as Date), to: jstDate(c.ends_at as Date) > d ? "24:00" : jstTime(c.ends_at as Date), note: c.note ?? "" })),
+        hours: hours.map((h: Record<string, unknown>) => ({ open: h.o, close: h.c })),
+        pendingCount: pend[0].n,
+      };
+    }
+
+    case "admin_pending": {
+      return { bookings: await bookingsWhere(sql, sql`b.status = 'pending' and b.ends_at > ${now.toISOString()}::timestamptz`) };
+    }
+
+    // 確定・お断り（患者さんの LINE に知らせる）
+    case "admin_decide": {
+      const id = str(body.bookingId, 40);
+      if (!UUID_RE.test(id)) throw new ApiError("booking_not_found");
+      const ok = body.decision === "confirm";
+      if (!ok && body.decision !== "reject") throw new ApiError("bad_request");
+      const rows = await sql`
+        update bookings set status = ${ok ? "confirmed" : "rejected"}, confirmed_at = ${ok ? now.toISOString() : null}::timestamptz
+        where id = ${id}::uuid and status = 'pending' returning id`;
+      if (!rows.length) throw new ApiError("booking_not_pending", 409);
+      const b = await bookingFull(sql, id);
+      const when = whenText(b.starts_at);
+      const text = ok
+        ? `【ご予約が確定しました】\n${when}\n${b.business_name}　${b.menu_name}\n当日お待ちしております。${TAIL}`
+        : `【ご予約について】\n申し訳ありません。${when}のご予約はお受けできませんでした。\nお手数ですが、別の日時でご予約ください。${TAIL}`;
+      const sent = await tellPatient(deps, b.line_user_id, text);
+      return { ok: true, sent };
+    }
+
+    // 来院・直前キャンセル・ドタキャン（付け直しは confirmed）
+    case "admin_outcome": {
+      const id = str(body.bookingId, 40);
+      if (!UUID_RE.test(id)) throw new ApiError("booking_not_found");
+      const o = str(body.outcome, 20);
+      if (!["done", "no_show", "late_cancel", "confirmed"].includes(o)) throw new ApiError("bad_request");
+      try {
+        await sql`select lp_set_outcome(${id}::uuid, ${o}, ${str(body.note, 200) || null})`;
+      } catch (e) {
+        if (String((e as Error).message).includes("booking_not_found")) throw new ApiError("booking_not_found", 404);
+        throw e;
+      }
+      return { ok: true };
+    }
+
+    // HIROさんが取り消す（患者さんに知らせるかは選べる）
+    case "admin_cancel": {
+      const id = str(body.bookingId, 40);
+      if (!UUID_RE.test(id)) throw new ApiError("booking_not_found");
+      const rows = await sql`update bookings set status = 'cancelled', cancelled_at = now()
+        where id = ${id}::uuid and status in ('pending','confirmed') returning id`;
+      if (!rows.length) throw new ApiError("booking_not_found", 404);
+      let sent = false;
+      if (body.tellPatient) {
+        const b = await bookingFull(sql, id);
+        sent = await tellPatient(deps, b.line_user_id,
+          `【ご予約の取り消し】\n${whenText(b.starts_at)}のご予約を取り消しました。\n${str(body.message, 300) || "またのご予約をお待ちしております。"}${TAIL}`);
+      }
+      return { ok: true, sent };
+    }
+
+    // お客さま
+    case "admin_customers": {
+      const q = str(body.q, 40).normalize("NFKC");
+      const like = `%${q.replace(/[%_\\]/g, (c) => "\\" + c)}%`;
+      const digits = q.replace(/[^0-9]/g, "");
+      const filter = str(body.filter, 20);
+      const rows = await sql`
+        select c.id, c.name, c.name_kana, c.phone, c.line_name, c.line_user_id, c.is_returning, c.is_blocked, c.memo,
+               st.visits, st.no_shows, st.late_cancels,
+               (select min(starts_at) from bookings b where b.customer_id = c.id and b.status in ('pending','confirmed') and b.starts_at > ${now.toISOString()}::timestamptz) as next_at,
+               (select max(starts_at) from bookings b where b.customer_id = c.id and b.status = 'done') as last_at
+        from customers c left join customer_stats st on st.customer_id = c.id
+        where c.name is not null
+          and (${q} = '' or c.name ilike ${like} or c.name_kana ilike ${like} or c.line_name ilike ${like} or (${digits} <> '' and c.phone like ${"%" + digits + "%"}))
+          and (${filter} = '' or (${filter} = 'returning' and c.is_returning and not c.is_blocked)
+               or (${filter} = 'new' and not c.is_returning and not c.is_blocked)
+               or (${filter} = 'blocked' and c.is_blocked)
+               or (${filter} = 'noshow' and coalesce(st.no_shows,0) > 0))
+        order by c.name_kana nulls last, c.name
+        limit 300`;
+      return {
+        customers: rows.map((c: Record<string, unknown>) => ({
+          id: c.id, name: c.name, kana: c.name_kana ?? "", phone: c.phone ?? "", lineName: c.line_name ?? "", hasLine: !!c.line_user_id,
+          isReturning: !!c.is_returning, isBlocked: !!c.is_blocked, memo: c.memo ?? "",
+          visits: Number(c.visits ?? 0), noShows: Number(c.no_shows ?? 0), lateCancels: Number(c.late_cancels ?? 0),
+          next: c.next_at ? whenText(c.next_at as Date) : "", last: c.last_at ? md(jstDate(c.last_at as Date)) : "",
+        })),
+      };
+    }
+
+    case "admin_customer_update": {
+      const id = str(body.customerId, 40);
+      if (!UUID_RE.test(id)) throw new ApiError("customer_not_found");
+      const cur = await sql`select * from customers where id = ${id}::uuid`;
+      if (!cur.length) throw new ApiError("customer_not_found", 404);
+      const c = cur[0];
+      const isReturning = typeof body.isReturning === "boolean" ? body.isReturning : c.is_returning;
+      const isBlocked = typeof body.isBlocked === "boolean" ? body.isBlocked : c.is_blocked;
+      const memo = typeof body.memo === "string" ? str(body.memo, 500) : c.memo;
+      await sql`update customers set is_returning = ${isReturning}, is_blocked = ${isBlocked}, memo = ${memo} where id = ${id}::uuid`;
+      return { ok: true };
+    }
+
+    case "admin_customer": {
+      const id = str(body.customerId, 40);
+      if (!UUID_RE.test(id)) throw new ApiError("customer_not_found");
+      const list = await bookingsWhere(sql, sql`b.customer_id = ${id}::uuid and b.status not in ('rejected')`);
+      return { bookings: list.reverse().slice(0, 50) };
+    }
+
+    // LINE で連絡する
+    case "admin_message": {
+      const id = str(body.customerId, 40);
+      const text = str(body.text, 1000);
+      if (!UUID_RE.test(id)) throw new ApiError("customer_not_found");
+      if (!text) throw new ApiError("message_required");
+      const c = await sql`select line_user_id from customers where id = ${id}::uuid`;
+      if (!c.length) throw new ApiError("customer_not_found", 404);
+      if (!c[0].line_user_id) throw new ApiError("no_line", 409);
+      const sent = await tellPatient(deps, c[0].line_user_id, text);
+      if (!sent) throw new ApiError("send_failed", 502);
+      return { ok: true };
+    }
+
+    // 休み
+    case "admin_closures": {
+      const rows = await sql`select id, starts_at, ends_at, note from closures where ends_at > ${now.toISOString()}::timestamptz order by starts_at limit 100`;
+      return {
+        closures: rows.map((c: Record<string, unknown>) => {
+          const s = c.starts_at as Date, e = c.ends_at as Date;
+          return { id: c.id, date: jstDate(s), endDate: jstDate(new Date(e.getTime() - 1)), from: jstTime(s), to: jstTime(e) === "00:00" ? "24:00" : jstTime(e), note: c.note ?? "" };
+        }),
+      };
+    }
+    case "admin_closure_add": {
+      const d1 = str(body.date, 10), d2 = str(body.endDate, 10) || d1;
+      const f = str(body.from, 5) || "00:00", t = str(body.to, 5) || "24:00";
+      if (!DATE_RE.test(d1) || !DATE_RE.test(d2) || d2 < d1 || !/^\d{2}:\d{2}$/.test(f) || !/^\d{2}:\d{2}$/.test(t)) throw new ApiError("bad_request");
+      const start = new Date(Date.parse(`${d1}T${f}:00+09:00`)).toISOString();
+      const end = t === "24:00" ? new Date(Date.parse(`${d2}T00:00:00+09:00`) + 86400000).toISOString() : new Date(Date.parse(`${d2}T${t}:00+09:00`)).toISOString();
+      if (end <= start) throw new ApiError("bad_request");
+      await sql`insert into closures (starts_at, ends_at, note) values (${start}::timestamptz, ${end}::timestamptz, ${str(body.note, 100) || null})`;
+      const conflicts = await bookingsWhere(sql, sql`b.status in ('pending','confirmed') and tstzrange(b.starts_at, b.ends_at, '[)') && tstzrange(${start}::timestamptz, ${end}::timestamptz, '[)')`);
+      return { ok: true, conflicts };
+    }
+    case "admin_closure_del": {
+      const id = str(body.id, 40);
+      if (!UUID_RE.test(id)) throw new ApiError("bad_request");
+      await sql`delete from closures where id = ${id}::uuid`;
+      return { ok: true };
+    }
+
+    // 手で予約を入れる（電話・来院で受けたもの）
+    case "admin_slots": {
+      const d = str(body.date, 10), menuId = str(body.menuId, 40);
+      if (!DATE_RE.test(d) || !UUID_RE.test(menuId)) throw new ApiError("bad_request");
+      const rows = await sql`
+        with m as (select duration_min, buffer_after_min from menus where id = ${menuId}::uuid),
+        h as (select ((${d}::date + open_time) at time zone 'Asia/Tokyo') as op, ((${d}::date + close_time) at time zone 'Asia/Tokyo') as cl from business_hours where weekday = ${isoWeekday(d)}),
+        c as (select gs as s, gs + make_interval(mins => m.duration_min + m.buffer_after_min) as b
+              from h, m, generate_series(h.op, h.cl - make_interval(mins => m.duration_min), interval '15 minutes') gs)
+        select c.s from c where not exists (
+          select 1 from bookings bk where bk.status in ('pending','confirmed')
+            and tstzrange(bk.starts_at, bk.block_until, '[)') && tstzrange(c.s, c.b, '[)'))
+        order by c.s`;
+      return { slots: rows.map((r: Record<string, unknown>) => ({ startsAt: (r.s as Date).toISOString(), time: jstTime(r.s as Date) })) };
+    }
+    case "admin_book": {
+      const menuId = str(body.menuId, 40);
+      const t = Date.parse(str(body.startsAt, 40));
+      if (!UUID_RE.test(menuId) || Number.isNaN(t)) throw new ApiError("bad_request");
+      let custId = str(body.customerId, 40);
+      if (!UUID_RE.test(custId)) {
+        const name = str(body.name, 30);
+        if (!name) throw new ApiError("name_required");
+        const phone = body.phone ? normalizePhone(body.phone) : null;
+        if (body.phone && !phone) throw new ApiError("phone_invalid");
+        const kana = body.nameKana ? normalizeKana(body.nameKana) : null;
+        const r = await sql`insert into customers (name, name_kana, phone) values (${name}, ${kana}, ${phone}) returning id`;
+        custId = r[0].id;
+      }
+      let id: string;
+      try {
+        const r = await sql`select lp_create_booking(${custId}::uuid, ${menuId}::uuid, ${new Date(t).toISOString()}::timestamptz, null::text[], 'admin') as id`;
+        id = r[0].id;
+      } catch (e) {
+        const msg = String((e as Error).message);
+        for (const code of ["slot_not_available", "menu_not_found", "customer_blocked", "customer_not_found"]) if (msg.includes(code)) throw new ApiError(code, 409);
+        throw e;
+      }
+      let sent = false;
+      if (body.tellPatient) {
+        const b = await bookingFull(sql, id);
+        sent = await tellPatient(deps, b.line_user_id, `【ご予約を承りました】\n${whenText(b.starts_at)}\n${b.business_name}　${b.menu_name}\n当日お待ちしております。${TAIL}`);
+      }
+      return { ok: true, id, sent };
     }
 
     default:

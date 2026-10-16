@@ -13,7 +13,8 @@
     menu: null,          // 選んだメニュー
     slot: null,          // { startsAt, time, date, weekday }
     symptoms: [],
-    from: null,          // 日付ページの先頭
+    from: null,          // カレンダーの月（YYYY-MM）
+    day: null,           // 選んだ日
     afterProfile: null,  // 登録が済んだら戻る先
   };
 
@@ -21,7 +22,7 @@
   var MOMINOKI_NOTE =
     '<div class="notice" role="note"><b>保険についてのご案内</b>' +
     "ケガ以外の症状は保険外となりますので<br>ご了承ください。" +
-    '<span class="ex">（保険が適応されない例：<br>肩こり、腰痛、慢性痛、疲労、<br>繰り返しの動作で発生した痛み）</span></div>';
+    '<span class="ex">（保険が適応されない例：肩こり、腰痛、慢性痛、疲労、繰り返しの動作で発生した痛み）</span></div>';
   function mominokiNote() { return S.business && S.business.id === "mominoki" ? MOMINOKI_NOTE : ""; }
 
   var ERR = {
@@ -226,47 +227,89 @@
     });
   }
 
+  // ---------- 日時：ひと月のカレンダー → その日の時間（同じ画面の中で切り替える） marker: month-calendar-v1 ----------
+  var MARK = { open: "○", few: "△", full: "×", off: "休", out: "" };
   function chooseTime() {
-    loading("空いている時間を調べています…");
-    api("days", { menuId: S.menu.id, from: S.from }).then(function (r) {
-      S.from = r.from;
-      var single = S.data.menus.filter(function (m) { return m.businessId === S.business.id; }).length === 1;
-      var h = '<button class="back" id="back">← もどる</button>' + steps(3) +
-        "<h2>ご希望の日時をお選びください</h2>" +
-        '<p class="lead">' + esc(S.menu.name) + "（" + S.menu.durationMin + "分）</p>" + mominokiNote();
-      var any = false;
-      r.days.forEach(function (d) {
-        var sat = d.weekday === "土";
-        h += '<div class="day"><div class="day-head"><span class="day-date">' + md(d.date) + "</span>" +
-          '<span class="day-wd' + (sat ? " sat" : "") + '">（' + esc(d.weekday) + "）</span>" +
-          (d.slots.length ? "" : '<span class="day-full">満席・お休み</span>') + "</div>";
-        if (d.slots.length) {
-          any = true;
-          h += '<div class="times">';
-          d.slots.forEach(function (s) {
-            h += '<button class="time" data-at="' + esc(s.startsAt) + '" data-time="' + esc(s.time) + '" data-date="' + esc(d.date) + '" data-wd="' + esc(d.weekday) + '">' + esc(s.time) + "</button>";
-          });
-          h += "</div>";
-        }
-        h += "</div>";
+    var single = S.data.menus.filter(function (m) { return m.businessId === S.business.id; }).length === 1;
+    view('<button class="back" id="back">← もどる</button>' + steps(3) +
+      "<h2>ご希望の日をお選びください</h2>" +
+      '<p class="lead">' + esc(S.menu.name) + "（" + S.menu.durationMin + "分）</p>" + mominokiNote() +
+      '<div class="card cal-card" id="cal"><div class="loading small-loading"><div class="spinner" aria-hidden="true"></div></div></div>' +
+      '<div class="cal-key"><span>○ 空きあり</span><span>△ 残りわずか</span><span>× 満席</span><span>休 お休み</span></div>' +
+      '<div id="slots"></div>');
+    document.getElementById("back").onclick = function () { S.from = null; S.day = null; if (single) chooseBusiness(); else chooseMenu(); };
+    loadMonth(S.from);
+  }
+
+  function loadMonth(month) {
+    var $cal = document.getElementById("cal");
+    if (!$cal) return;
+    $cal.classList.add("busy");
+    api("month", { menuId: S.menu.id, month: month }).then(function (r) {
+      S.from = r.month;
+      var h = '<div class="cal-head">' +
+        '<button class="cal-nav" id="pm"' + (r.prev ? "" : " disabled") + ' aria-label="前の月">‹</button>' +
+        '<span class="cal-title">' + esc(r.label) + "</span>" +
+        '<button class="cal-nav" id="nm"' + (r.next ? "" : " disabled") + ' aria-label="次の月">›</button></div>' +
+        '<div class="cal-grid">';
+      ["日", "月", "火", "水", "木", "金", "土"].forEach(function (w, i) {
+        h += '<span class="cal-wd' + (i === 0 ? " sun" : i === 6 ? " sat" : "") + '">' + w + "</span>";
       });
-      if (!r.days.length || !any) h += '<div class="card empty">この期間はご予約いただける時間がありません。</div>';
-      h += '<div class="pager">' +
-        (r.prev ? '<button class="btn ghost" id="prev">← 前の2週間</button>' : "") +
-        (r.next ? '<button class="btn ghost" id="next">次の2週間 →</button>' : "") + "</div>";
-      view(h);
-      document.getElementById("back").onclick = function () { S.from = null; if (single) chooseBusiness(); else chooseMenu(); };
-      var pv = document.getElementById("prev"), nx = document.getElementById("next");
-      if (pv) pv.onclick = function () { S.from = r.prev; chooseTime(); };
-      if (nx) nx.onclick = function () { S.from = r.next; chooseTime(); };
-      Array.prototype.forEach.call($app.querySelectorAll("[data-at]"), function (btn) {
+      for (var k = 0; k < r.lead; k++) h += "<span></span>";
+      var anyOpen = false;
+      r.days.forEach(function (d) {
+        var can = d.state === "open" || d.state === "few";
+        if (can) anyOpen = true;
+        h += (can ? '<button class="cal-d ' + d.state + (S.day === d.date ? " on" : "") + '" data-day="' + esc(d.date) + '">'
+                  : '<span class="cal-d ' + d.state + '">') +
+          '<b>' + d.day + "</b><i>" + MARK[d.state] + "</i>" + (can ? "</button>" : "</span>");
+      });
+      h += "</div>";
+      if (!anyOpen) h += '<p class="empty">この月はご予約いただける日がありません。</p>';
+      $cal.innerHTML = h;
+      $cal.classList.remove("busy");
+      var pm = document.getElementById("pm"), nm = document.getElementById("nm");
+      if (r.prev) pm.onclick = function () { S.day = null; document.getElementById("slots").innerHTML = ""; loadMonth(r.prev); };
+      if (r.next) nm.onclick = function () { S.day = null; document.getElementById("slots").innerHTML = ""; loadMonth(r.next); };
+      Array.prototype.forEach.call($cal.querySelectorAll("[data-day]"), function (b) {
+        b.onclick = function () {
+          Array.prototype.forEach.call($cal.querySelectorAll(".cal-d.on"), function (x) { x.classList.remove("on"); });
+          b.classList.add("on");
+          S.day = b.getAttribute("data-day");
+          loadSlots(S.day);
+        };
+      });
+      if (S.day && $cal.querySelector('[data-day="' + S.day + '"]')) loadSlots(S.day, true);
+    }, function (e) { fail(e); home(); });
+  }
+
+  function loadSlots(date, quiet) {
+    var $s = document.getElementById("slots");
+    $s.innerHTML = '<div class="loading small-loading"><div class="spinner" aria-hidden="true"></div></div>';
+    api("slots", { menuId: S.menu.id, date: date }).then(function (r) {
+      var h = '<div class="day" id="dayslots"><div class="day-head"><span class="day-date">' + md(r.date) + "</span>" +
+        '<span class="day-wd' + (r.weekday === "土" ? " sat" : r.weekday === "日" ? " sun" : "") + '">（' + esc(r.weekday) + "）</span>" +
+        '<span class="day-full">時間をお選びください</span></div>';
+      if (!r.slots.length) h += '<p class="empty">この日は満席になりました。別の日をお選びください。</p>';
+      else {
+        h += '<div class="times">';
+        r.slots.forEach(function (sl) {
+          h += '<button class="time" data-at="' + esc(sl.startsAt) + '" data-time="' + esc(sl.time) + '">' + esc(sl.time) + "</button>";
+        });
+        h += "</div>";
+      }
+      $s.innerHTML = h + "</div>";
+      Array.prototype.forEach.call($s.querySelectorAll("[data-at]"), function (btn) {
         btn.onclick = function () {
-          S.slot = { startsAt: btn.getAttribute("data-at"), time: btn.getAttribute("data-time"),
-                     date: btn.getAttribute("data-date"), weekday: btn.getAttribute("data-wd") };
+          S.slot = { startsAt: btn.getAttribute("data-at"), time: btn.getAttribute("data-time"), date: r.date, weekday: r.weekday };
           chooseSymptoms();
         };
       });
-    }, function (e) { fail(e); home(); });
+      if (!quiet) {
+        var el = document.getElementById("dayslots");
+        if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, function (e) { fail(e); });
   }
 
   function chooseSymptoms() {

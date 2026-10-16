@@ -153,3 +153,31 @@ h2, .brand-title, .choice .name { text-wrap: balance; }
 .namerow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .link { background: none; border: 0; color: var(--blue); font-weight: 700; font-size: 15px; text-decoration: underline;
   text-underline-offset: 3px; padding: 6px 0; cursor: pointer; white-space: nowrap; }
+.notice .ex { word-break: normal; text-wrap: wrap; }
+
+/* ---------- ひと月のカレンダー  marker: month-calendar-v1 ---------- */
+.cal-card { padding: 12px 10px 14px; transition: opacity .15s; }
+.cal-card.busy { opacity: .5; }
+.small-loading { padding: 18px 0; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; margin: 0 4px 8px; }
+.cal-title { font-size: 20px; font-weight: 700; }
+.cal-nav { width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--blue-soft); background: var(--blue-soft); color: var(--blue);
+  font-size: 24px; font-weight: 700; cursor: pointer; line-height: 1; }
+.cal-nav:disabled { opacity: .3; cursor: default; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-wd { text-align: center; font-size: 13px; color: var(--mute); padding: 2px 0 4px; font-weight: 700; }
+.cal-wd.sun { color: var(--red); } .cal-wd.sat { color: var(--blue); }
+.cal-d { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-height: 52px; border-radius: 10px;
+  border: 2px solid transparent; background: none; padding: 2px 0; font: inherit; color: var(--ink); }
+.cal-d b { font-size: 17px; line-height: 1.1; }
+.cal-d i { font-style: normal; font-size: 13px; line-height: 1.1; font-weight: 700; min-height: 14px; }
+button.cal-d { background: var(--blue-soft); cursor: pointer; }
+button.cal-d i { color: var(--blue); }
+button.cal-d.few i { color: #b45309; }
+button.cal-d.on { background: var(--blue); border-color: var(--blue); color: #fff; }
+button.cal-d.on i { color: #fff; }
+.cal-d.full, .cal-d.off { color: #9aa3b5; }
+.cal-d.out { color: #c9d0dd; }
+.cal-key { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; font-size: 13px; color: var(--mute); margin: -4px 0 12px; }
+.day-wd.sun { color: var(--red); }
+#slots .day { scroll-margin-top: 12px; }

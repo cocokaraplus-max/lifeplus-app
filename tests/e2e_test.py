@@ -56,8 +56,12 @@ with sync_playwright() as p:
     check("ボディケアのメニューが4つ", pg.locator("[data-menu]").count() == 4)
     pg.screenshot(path=f"{SHOTS}/04_menu.png")
     pg.get_by_role("button", name="眠れるボディケアコース").click()
-    expect(pg.get_by_role("heading", name="ご希望の日時をお選びください")).to_be_visible()
-    mon = pg.locator(".day", has_text="10月19日")
+    expect(pg.get_by_role("heading", name="ご希望の日をお選びください")).to_be_visible()
+    expect(pg.locator(".cal-title")).to_have_text("2026年10月")
+    check("カレンダー：日曜は休、16日（今日）は受付外", pg.locator('.cal-d.off', has_text="18").count() == 1 and pg.locator('button[data-day="2026-10-16"]').count() == 0)
+    pg.locator('[data-day="2026-10-19"]').click()
+    mon = pg.locator("#slots")
+    expect(mon.locator(".time").first).to_be_visible()
     times = mon.locator(".time").all_inner_texts()
     check("月曜の60分は17:00〜19:00の9つ", times[0] == "17:00" and times[-1] == "19:00" and len(times) == 9)
     pg.screenshot(path=f"{SHOTS}/05_time.png", full_page=True)
@@ -88,14 +92,16 @@ with sync_playwright() as p:
     # 2. 接骨院はメニューが1つなので日時へ直行。17:00〜18:15 は埋まっていて最初は18:15
     pg.get_by_role("button", name="新しく予約する").click()
     pg.locator("[data-biz=mominoki]").click()
-    expect(pg.get_by_role("heading", name="ご希望の日時をお選びください")).to_be_visible()
-    first = pg.locator(".day", has_text="10月19日").locator(".time").first.inner_text()
+    expect(pg.get_by_role("heading", name="ご希望の日をお選びください")).to_be_visible()
+    pg.locator('[data-day="2026-10-19"]').click()
+    expect(pg.locator("#slots .time").first).to_be_visible()
+    first = pg.locator("#slots .time").first.inner_text()
     check("接骨院の月曜の最初の枠は18:15（ボディケア＋片付けの後）", first == "18:15")
     check("接骨院の日時の画面に保険のご案内", pg.locator(".notice", has_text="ケガ以外の症状は保険外となりますので").is_visible())
 
     # 3. 選んでいるあいだに別の人が同じ時間を取った → 案内して時間を選び直し
     api("p2", "profile", name="別の人", nameKana="ベツノヒト", phone="0565111111")
-    slot = pg.locator(".day", has_text="10月19日").get_by_role("button", name="18:15")
+    slot = pg.locator("#slots").get_by_role("button", name="18:15")
     at = slot.get_attribute("data-at")
     slot.click()
     pg.get_by_role("button", name="確認へ進む").click()
@@ -104,8 +110,9 @@ with sync_playwright() as p:
     check("別の人が先に18:15を取った", r.get("booking", {}).get("time") == "18:15")
     pg.get_by_role("button", name="予約する").click()
     expect(pg.locator("#toast")).to_contain_text("たった今埋まってしまいました")
-    expect(pg.get_by_role("heading", name="ご希望の日時をお選びください")).to_be_visible()
-    first2 = pg.locator(".day", has_text="10月19日").locator(".time").first.inner_text()
+    expect(pg.get_by_role("heading", name="ご希望の日をお選びください")).to_be_visible()
+    expect(pg.locator("#slots .time").first).to_be_visible()
+    first2 = pg.locator("#slots .time").first.inner_text()
     check("選び直しの一覧から18:15が消えている", first2 == "18:30")
 
     # 4. 取り消し
@@ -116,12 +123,15 @@ with sync_playwright() as p:
     expect(pg.locator("#toast")).to_contain_text("取り消しました")
     check("取り消し後は予約0件", pg.locator(".bk").count() == 0)
 
-    # 5. 2週間ずつめくれる
+    # 5. 月をめくれる（今月より前には戻れない）
     pg.get_by_role("button", name="新しく予約する").click()
     pg.locator("[data-biz=mominoki]").click()
-    pg.get_by_role("button", name="次の2週間 →").click()
-    expect(pg.get_by_role("button", name="← 前の2週間")).to_be_visible()
-    check("次の2週間の先頭は10月30日以降", pg.locator(".day-date").first.inner_text() in ("10月31日", "11月2日"))
+    expect(pg.locator(".cal-title")).to_have_text("2026年10月")
+    check("今月より前には戻れない", pg.locator("#pm").is_disabled())
+    pg.locator("#nm").click()
+    expect(pg.locator(".cal-title")).to_have_text("2026年11月")
+    pg.screenshot(path=f"{SHOTS}/05b_month.png", full_page=True)
+    check("11月は月・木・土に空き", pg.locator('button[data-day="2026-11-02"]').count() == 1 and pg.locator('button[data-day="2026-11-03"]').count() == 0)
 
     # 6. ブロックされた人
     api("vendor", "init")
