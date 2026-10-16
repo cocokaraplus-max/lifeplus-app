@@ -1,4 +1,4 @@
-/* LIFE PLUS 予約管理（HIROさんだけ）  marker: lifeplus-admin-ui-v1
+/* LIFE PLUS 予約管理（HIROさんと、招待した人）  marker: lifeplus-admin-ui-v1 / staff-ui-v1
    タブ：今日（15分刻みの予約表・×で止める）／確認待ち／休み／お客さま
    操作はすべて関所（API_URL の admin_*）を通す。HIROさん以外の LINE では関所が断る。 */
 (function () {
@@ -22,6 +22,13 @@
 
   var ERR = {
     not_admin: "このLINEでは管理画面を開けません。",
+    no_permission: "この操作はできない設定になっています。HIROさんに頼んでください。",
+    invite_invalid: "この招待リンクは使えません。HIROさんに新しいリンクをもらってください。",
+    invite_expired: "この招待リンクは期限が切れています。HIROさんに新しいリンクをもらってください。",
+    invite_self: "HIROさんのLINEでは招待リンクは使えません（もう全部できます）。",
+    invite_already_staff: "このLINEはすでに参加しています。",
+    label_required: "呼び名を入れてください。",
+    staff_not_found: "この人は見つかりませんでした。",
     no_token: "LINEのログインが切れました。開き直してください。",
     token_invalid: "LINEのログインが切れました。開き直してください。",
     booking_not_pending: "この予約はもう確認済みです。",
@@ -77,6 +84,15 @@
     var w = wdOf(ymd) === 0 ? 7 : wdOf(ymd);
     return (A.init.hours || []).filter(function (h) { return h.weekday === w; });
   }
+  // できること（HIROさんは全部）
+  function can(p) { var me = A.init && A.init.me; return !!me && (me.owner || me.perms.indexOf(p) >= 0); }
+  function owner() { return !!(A.init && A.init.me && A.init.me.owner); }
+  var PERM_LABELS = [
+    ["closures", "休み・×の設定", "休み"],
+    ["bookings", "予約の確定・取消・来院の記録・手で予約", "予約"],
+    ["customers", "お客さまの名簿・メモ・LINE連絡", "お客さま"],
+    ["notify", "予約・キャンセルのLINE通知を受け取る", "通知"],
+  ];
   function bizClass(id) { return id === "mominoki" ? "mo" : "bc"; }
   function bizName(id) { var b = (A.init.businesses || []).filter(function (x) { return x.id === id; })[0]; return b ? b.name : ""; }
   function isPast(b) { return Date.parse(b.startsAt) <= Date.now(); }
@@ -129,6 +145,7 @@
     pending: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
     off: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M6 6l12 12"/></svg>',
     cust: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.6.9 2.6 2.6 3 5.2"/></svg>',
+    staff: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/><path d="M19 3v5M16.5 5.5h5"/></svg>',
   };
   function sizes() {
     return '<div class="sizes" role="group" aria-label="文字の大きさ">' +
@@ -138,12 +155,14 @@
   }
   function frame(barInner, mainHtml, extra) {
     var pc = A.day ? A.day.pendingCount : A.init.pendingCount;
-    var tabs = [["day", "予約表"], ["pending", "確認待ち"], ["off", "休み"], ["cust", "お客さま"]].map(function (t) {
+    var tabs = [["day", "予約表"], ["pending", "確認待ち"], ["off", "休み"], ["cust", "お客さま"], ["staff", "スタッフ"]].filter(function (t) {
+      return t[0] === "off" ? can("closures") : t[0] === "cust" ? can("customers") : t[0] === "staff" ? owner() : true;
+    }).map(function (t) {
       return '<button data-tab="' + t[0] + '" class="' + (A.tab === t[0] ? "on" : "") + '"' + (A.tab === t[0] ? ' aria-current="page"' : "") + ">" +
         ICONS[t[0]] + t[1] + (t[0] === "pending" && pc ? '<span class="badge">' + pc + "</span>" : "") + "</button>";
     }).join("");
     $app.innerHTML =
-      '<header class="bar"><div class="bar-top"><span><b>LIFE PLUS</b>　予約管理</span>' + sizes() + "</div>" + barInner + "</header>" +
+      '<header class="bar"><div class="bar-top"><span><b>LIFE PLUS</b>　予約管理' + (owner() ? "" : "（" + esc(A.init.me.label) + "）") + "</span>" + sizes() + "</div>" + barInner + "</header>" +
       "<main>" + mainHtml + "</main>" + (extra || "") +
       '<nav class="tabs" aria-label="切り替え">' + tabs + "</nav>";
     on("[data-tab]", function (b) { go(b.getAttribute("data-tab")); });
@@ -154,6 +173,7 @@
     if (tab === "day") return loadDay(A.date);
     if (tab === "pending") return showPending();
     if (tab === "off") return showOff();
+    if (tab === "staff") return showStaff();
     return showCustomers();
   }
   function loadingMain(title) {
@@ -176,6 +196,7 @@
       '<div class="day"><button class="arrow" id="dp" aria-label="前の日">‹</button>' +
       "<h1>" + mdj(d.date) + "<small>（" + esc(d.weekday) + "）</small></h1>" +
       (d.date !== A.init.today ? '<button class="today-btn" id="dt">今日</button>' : "") +
+      '<button class="today-btn" id="dm" aria-label="カレンダーで日を選ぶ">月</button>' +
       '<button class="arrow" id="dn" aria-label="次の日">›</button></div>' +
       '<div class="sub">' + (hours.length ? hours.map(function (h) { return h.open + "〜" + h.close; }).join("・") + "　予約 " + live.length + "件" : "受付のない曜日です") + "</div>";
 
@@ -189,17 +210,18 @@
     } else {
       h += '<div class="legend"><span><i class="sw mo"></i>接骨院</span><span><i class="sw bc"></i>ボディケア</span><span><i class="sw pd"></i>確認待ち</span><span><i class="sw x"></i>×（受けない）</span></div>';
       h += timeline(d);
-      h += '<p class="note">空いている枠を押すと、予約を入れたり×にしたりできます。</p>';
+      if (can("bookings") || can("closures")) h += '<p class="note">空いている枠を押すと、' + (can("bookings") && can("closures") ? "予約を入れたり×にしたり" : can("bookings") ? "予約を入れることが" : "×にすることが") + "できます。</p>";
     }
-    frame(bar, h, '<button class="fab" id="fab" aria-label="予約を手で入れる">＋</button>');
+    frame(bar, h, can("bookings") ? '<button class="fab" id="fab" aria-label="予約を手で入れる">＋</button>' : "");
     $("#dp").onclick = function () { loadDay(addDays(A.date, -1)); };
     $("#dn").onclick = function () { loadDay(addDays(A.date, 1)); };
     if ($("#dt")) $("#dt").onclick = function () { loadDay(A.init.today); };
+    $("#dm").onclick = function () { monthSheet(A.date.slice(0, 7)); };
     if ($("#gowait")) $("#gowait").onclick = function () { go("pending"); };
-    $("#fab").onclick = function () { bookForm({ date: A.date }); };
+    if ($("#fab")) $("#fab").onclick = function () { bookForm({ date: A.date }); };
     on("[data-bk]", function (el) { slip(el.getAttribute("data-bk")); });
     on("[data-free]", function (el) { freeSlot(el.getAttribute("data-free")); });
-    on("[data-x]", function (el) { xSheet(el.getAttribute("data-x")); });
+    on("button[data-x]", function (el) { xSheet(el.getAttribute("data-x")); });
   }
 
   function timeline(d) {
@@ -221,14 +243,15 @@
     var h = '<div class="tl" style="height:' + (y(close) + 10) + 'px">';
     for (var m = open; m < close; m += 15) {
       h += '<div class="row' + (m % 60 === 0 ? " hour" : "") + '" style="position:absolute;left:0;right:0;top:' + y(m) + 'px"><span class="lb">' + hm(m) + "</span>" +
-        (inHours(m) && !busyAt(m) ? '<button class="free" data-free="' + hm(m) + '" aria-label="' + hm(m) + ' 空き">空き</button>' : "") + "</div>";
+        (inHours(m) && !busyAt(m) && (can("bookings") || can("closures")) ? '<button class="free" data-free="' + hm(m) + '" aria-label="' + hm(m) + ' 空き">空き</button>' : "") + "</div>";
     }
     h += '<div class="row hour end" style="position:absolute;left:0;right:0;top:' + y(close) + 'px"><span class="lb">' + hm(close) + "</span></div>";
     d.closures.forEach(function (c) {
       var s = Math.max(open, toMin(c.from)), e = Math.min(close, toMin(c.to));
       if (e <= s) return;
-      h += '<button class="xblk" data-x="' + esc(c.id) + '" style="top:' + (y(s) + 3) + "px;height:" + (y(e) - y(s) - 6) + 'px">× ' +
-        esc(c.from === "00:00" && c.to === "24:00" ? "終日お休み" : c.from + "〜" + c.to) + (c.note ? "　" + esc(c.note) : "") + "</button>";
+      var tag = can("closures") ? "button" : "div";
+      h += "<" + tag + ' class="xblk" data-x="' + esc(c.id) + '" style="display:flex;align-items:center;top:' + (y(s) + 3) + "px;height:" + (y(e) - y(s) - 6) + 'px">× ' +
+        esc(c.from === "00:00" && c.to === "24:00" ? "終日お休み" : c.from + "〜" + c.to) + (c.note ? "　" + esc(c.note) : "") + "</" + tag + ">";
     });
     d.bookings.forEach(function (b) {
       var s = toMin(b.time), e = toMin(b.endTime), bu = toMin(b.blockUntil);
@@ -255,6 +278,33 @@
     return h + "</div>";
   }
 
+  // 月のカレンダーで日を選ぶ  marker: admin-month-ui-v1
+  function monthSheet(ym) {
+    openSheet('<div class="boot" style="padding:30px 0"><div class="spinner" aria-hidden="true"></div></div>');
+    api("admin_month", { month: ym }).then(function (r) {
+      if ($sheet.hidden) return;
+      var y = Number(ym.slice(0, 4)), mo = Number(ym.slice(5, 7));
+      var prev = ymdUTC(new Date(Date.UTC(y, mo - 2, 1))).slice(0, 7), next = ymdUTC(new Date(Date.UTC(y, mo, 1))).slice(0, 7);
+      var h = '<div class="cal-head"><button class="cal-nav" id="mp" aria-label="前の月">‹</button>' +
+        '<span class="cal-title">' + y + "年" + mo + '月</span><button class="cal-nav" id="mn" aria-label="次の月">›</button></div><div class="cal-grid">';
+      WD.forEach(function (w, i) { h += '<span class="cal-wd' + (i === 0 ? " sun" : i === 6 ? " sat" : "") + '">' + w + "</span>"; });
+      for (var i = 0; i < r.lead; i++) h += "<span></span>";
+      r.days.forEach(function (d) {
+        var cls = d.off === "all" ? "closed" : !d.open && !d.count ? "none" : d.off === "part" ? "part" : "open";
+        var mark = d.off === "all" ? "休" : d.count ? d.count + "件" : "";
+        h += '<button class="cal-d ' + cls + (d.date === A.init.today ? " today" : "") + (d.date === A.date ? " sel" : "") + '" data-md="' + d.date + '" aria-label="' + dayText(d.date) + (mark ? " " + mark : "") + '">' +
+          Number(d.date.slice(8)) + "<i>" + mark + "</i>" + (d.pending ? '<b class="dot" aria-hidden="true"></b>' : "") + "</button>";
+      });
+      h += '</div><div class="legend" style="margin-top:8px"><span>数字＝予約の件数</span><span><b class="dot" style="position:static;display:inline-block"></b>確認待ちあり</span><span><i class="sw x"></i>休み</span></div>' +
+        '<button class="btn gray wide" id="mt">今日を開く</button>';
+      $sb.innerHTML = h;
+      $("#mp").onclick = function () { monthSheet(prev); };
+      $("#mn").onclick = function () { monthSheet(next); };
+      $("#mt").onclick = function () { closeSheet(); loadDay(A.init.today); };
+      on("[data-md]", function (el) { closeSheet(); loadDay(el.getAttribute("data-md")); }, $sb);
+    }, function (e) { closeSheet(); fail(e); });
+  }
+
   // 空き枠を押したとき
   function freeSlot(t) {
     var m = toMin(t), d = A.day;
@@ -262,17 +312,17 @@
     openSheet(
       "<h3>" + dayText(d.date) + " " + esc(t) + "</h3>" +
       '<p class="note">この時間をどうしますか？</p>' +
-      '<button class="btn mint wide" id="fb">ここに予約を入れる</button>' +
-      '<button class="btn line wide" id="fx">' + esc(t + "〜" + hm(m + 15)) + " を×にする</button>" +
-      (close > m + 15 ? '<button class="btn gray wide" id="fxe">' + esc(t + "〜" + hm(close)) + " をまとめて×にする</button>" : "") +
-      '<p class="note">×にした時間は、患者さんの予約ページで選べなくなります。×を押すと外せます。</p>');
-    $("#fb").onclick = function () { bookForm({ date: d.date, time: t }); };
+      (can("bookings") ? '<button class="btn mint wide" id="fb">ここに予約を入れる</button>' : "") +
+      (can("closures") ? '<button class="btn line wide" id="fx">' + esc(t + "〜" + hm(m + 15)) + " を×にする</button>" +
+        (close > m + 15 ? '<button class="btn gray wide" id="fxe">' + esc(t + "〜" + hm(close)) + " をまとめて×にする</button>" : "") +
+        '<p class="note">×にした時間は、患者さんの予約ページで選べなくなります。×を押すと外せます。</p>' : ""));
+    if ($("#fb")) $("#fb").onclick = function () { bookForm({ date: d.date, time: t }); };
     var add = function (btn, to) {
       busy(btn, api("admin_closure_add", { date: d.date, from: t, to: to, note: "" })).then(function (r) {
         closeSheet(); toast("×にしました"); afterClosure(r); loadDay(d.date);
       }, fail);
     };
-    $("#fx").onclick = function () { add($("#fx"), hm(m + 15)); };
+    if ($("#fx")) $("#fx").onclick = function () { add($("#fx"), hm(m + 15)); };
     if ($("#fxe")) $("#fxe").onclick = function () { add($("#fxe"), hm(close)); };
   }
   // × を押したとき
@@ -334,20 +384,22 @@
         (b.outcomeNote ? "<div><dt>メモ</dt><dd>" + esc(b.outcomeNote) + "</dd></div>" : "") +
       "</dl>";
 
-    if (b.status === "pending") {
+    if (!can("bookings")) {
+      h += '<p class="note">確定・取り消しなどは、HIROさんにお願いしてください。</p>';
+    } else if (b.status === "pending") {
       h += '<div class="acts"><button class="btn mint" data-do="confirm">確定する</button><button class="btn gray" data-do="reject">お断りする</button></div>' +
         '<p class="note">確定・お断りは、患者さんのLINEにすぐ届きます。</p>' +
-        '<div class="danger-zone"><button class="link red" data-do="block">お断りしてブロック（営業など）</button></div>';
+        (can("customers") ? '<div class="danger-zone"><button class="link red" data-do="block">お断りしてブロック（営業など）</button></div>' : "");
     } else if (b.status === "confirmed" && !past) {
-      h += '<div class="acts">' + (c.hasLine ? '<button class="btn line" data-do="msg">LINEで連絡</button>' : "") +
+      h += '<div class="acts">' + (c.hasLine && can("customers") ? '<button class="btn line" data-do="msg">LINEで連絡</button>' : "") +
         '<button class="btn red" data-do="cancel">取り消す</button></div>';
     } else if (b.status === "confirmed" && past) {
       h += '<p class="note">来院されましたか？</p><div class="acts">' +
         '<button class="btn mint" data-do="done">来院</button><button class="btn gray" data-do="late_cancel">直前キャンセル</button><button class="btn red" data-do="no_show">無断キャンセル</button></div>';
     } else if (b.status === "done" || b.status === "no_show" || b.status === "late_cancel") {
-      h += '<div class="acts"><button class="btn gray" data-do="redo">記録を付け直す</button>' + (c.hasLine ? '<button class="btn line" data-do="msg">LINEで連絡</button>' : "") + "</div>";
+      h += '<div class="acts"><button class="btn gray" data-do="redo">記録を付け直す</button>' + (c.hasLine && can("customers") ? '<button class="btn line" data-do="msg">LINEで連絡</button>' : "") + "</div>";
     }
-    h += '<button class="btn gray wide" data-do="cust">この方の情報・履歴を見る</button>';
+    if (can("customers")) h += '<button class="btn gray wide" data-do="cust">この方の情報・履歴を見る</button>';
     openSheet(h);
 
     var done = function (msg) { return function () { closeSheet(); toast(msg); refresh(); }; };
@@ -432,7 +484,7 @@
           '<div class="who">' + esc(c.name) + (c.noShows ? ' <span class="pill ns">無断 ' + c.noShows + "回</span>" : c.visits ? ' <span class="pill reg">来院 ' + c.visits + "回</span>" : ' <span class="pill new">初めて</span>') + "</div>" +
           '<div class="meta">' + esc(bizName(b.businessId) + "　" + b.menuName) + "</div>" +
           '<div class="meta">' + (c.phone ? '<a href="' + esc(telHref(c.phone)) + '">' + esc(telText(c.phone)) + "</a>" : "") + (c.lineName ? "　LINE：" + esc(c.lineName) : "") + "</div>" +
-          '<div class="acts"><button class="btn mint" data-ok="' + esc(b.id) + '">確定</button><button class="btn gray" data-bk="' + esc(b.id) + '">詳しく見る</button></div></div>';
+          '<div class="acts">' + (can("bookings") ? '<button class="btn mint" data-ok="' + esc(b.id) + '">確定</button>' : "") + '<button class="btn gray" data-bk="' + esc(b.id) + '">詳しく見る</button></div></div>';
       }).join("") : '<div class="card empty">確認待ちの予約はありません。</div>';
       frame('<div class="day"><h1 class="title">確認待ち</h1></div><div class="sub">初めての方・無断キャンセルが続いた方の仮予約です</div>', h);
       on("[data-bk]", function (el) { slip(el.getAttribute("data-bk"), r.bookings); });
@@ -550,7 +602,8 @@
     var t;
     $("#q").oninput = function () { A.q = this.value; clearTimeout(t); t = setTimeout(loadCust, 300); };
     on("[data-f]", function (el) { A.filter = el.getAttribute("data-f"); showCustomers(); });
-    $("#nb").onclick = function () { bookForm({ date: A.date || A.init.today }); };
+    if (can("bookings")) $("#nb").onclick = function () { bookForm({ date: A.date || A.init.today }); };
+    else $("#nb").remove();
     loadCust();
   }
   function loadCust() {
@@ -588,7 +641,7 @@
           '<label class="f"><span>メモ（自分用）</span><textarea id="tm" maxlength="500">' + esc(c.memo) + "</textarea></label>" +
           '<button class="btn wide" id="ts">保存する</button>' +
           '<div class="acts">' + (c.hasLine ? '<button class="btn line" id="tl">LINEで連絡</button>' : "") +
-            (c.isBlocked ? "" : '<button class="btn mint" id="tk">予約を入れる</button>') + "</div>" +
+            (c.isBlocked || !can("bookings") ? "" : '<button class="btn mint" id="tk">予約を入れる</button>') + "</div>" +
           '<div class="hist"><h2 style="font-size:16px">履歴</h2>' +
           (hst.bookings.length ? hst.bookings.map(function (b) {
             return '<button class="h" data-bk="' + esc(b.id) + '" style="width:100%;background:none;border:0;border-bottom:1px solid var(--line);text-align:left"><span>' + mds(b.date) + "（" + WD[wdOf(b.date)] + "）" + esc(b.time) + "　" + esc(b.menuName) + "</span><b>" + esc(STATUS[b.status] || b.status) + "</b></button>";
@@ -631,14 +684,14 @@
           '</dd></div></dl><button class="link" id="wch">別の人にする</button>';
         $("#wch").onclick = function () { cust = null; drawWho(); };
       } else {
-        $("#who").innerHTML = '<label class="f"><span>お名前（名簿にいる方は候補から選べます）</span><input id="bn" maxlength="30" autocomplete="off" placeholder="例：山田 花子"></label>' +
+        $("#who").innerHTML = '<label class="f"><span>お名前' + (can("customers") ? "（名簿にいる方は候補から選べます）" : "") + '</span><input id="bn" maxlength="30" autocomplete="off" placeholder="例：山田 花子"></label>' +
           '<div id="sug"></div>' +
           '<label class="f"><span>フリガナ</span><input id="bk" maxlength="40" placeholder="ヤマダ ハナコ"></label>' +
           '<label class="f"><span>電話番号</span><input id="bp" type="tel" inputmode="tel" maxlength="15" placeholder="090-1234-5678"></label>';
         var t;
         $("#bn").oninput = function () {
           var q = this.value.trim(); clearTimeout(t);
-          if (!q) { $("#sug").innerHTML = ""; return; }
+          if (!q || !can("customers")) { $("#sug").innerHTML = ""; return; }
           t = setTimeout(function () {
             api("admin_customers", { q: q }).then(function (r) {
               var $s = $("#sug"); if (!$s) return;
@@ -692,6 +745,108 @@
     loadTimes();
   }
 
+  // =============================================================
+  // スタッフ（HIROさんだけ）  marker: staff-ui-v1
+  // =============================================================
+  function inviteUrl(code) { return "https://liff.line.me/" + CFG.LIFF_ID + "/admin/?join=" + encodeURIComponent(code); }
+  function untilText(iso) {
+    var d = new Date(Date.parse(iso) + 9 * 3600000);
+    return (d.getUTCMonth() + 1) + "/" + d.getUTCDate() + " " + hm(d.getUTCHours() * 60 + d.getUTCMinutes());
+  }
+  function permText(ps) {
+    var t = PERM_LABELS.filter(function (p) { return ps.indexOf(p[0]) >= 0; }).map(function (p) { return p[2]; });
+    return t.length ? t.join("・") : "予約表を見るだけ";
+  }
+  function showStaff() {
+    loadingMain("スタッフ");
+    api("admin_staff").then(function (r) {
+      A.staff = r.staff;
+      if (A.tab !== "staff") return;
+      var h = '<div class="card" style="padding:4px 12px">' + (r.staff.length ? r.staff.map(function (s) {
+        var st = s.joined ? '<span class="pill reg">参加済み</span>' : s.inviteExpired ? '<span class="pill ns">招待の期限切れ</span>' : '<span class="pill new">招待中</span>';
+        return '<button class="cust" data-s="' + esc(s.id) + '"><span class="av">' + esc(s.label.slice(0, 1)) + "</span>" +
+          '<span class="g"><span class="nm">' + esc(s.label) + "</span><br>" +
+          '<span class="sb">' + esc(permText(s.perms)) + "</span></span>" + st + "</button>";
+      }).join("") : '<div class="empty">まだ誰もいません。</div>') + "</div>" +
+        '<button class="btn mint wide" id="sadd">＋ 人を追加する（招待リンクを作る）</button>' +
+        '<p class="note">招待リンクをLINEで送り、相手がLINEで開くと参加になります。リンクは1回だけ・' + "3日間使えます。" +
+        "予約表を見るのは全員できます。それ以外は人ごとに選べます。</p>";
+      frame('<div class="day"><h1 class="title">スタッフ</h1></div><div class="sub">管理画面を使える人</div>', h);
+      $("#sadd").onclick = function () { staffForm(null); };
+      on("[data-s]", function (el) { staffForm(r.staff.filter(function (x) { return x.id === el.getAttribute("data-s"); })[0]); });
+    }, fail);
+  }
+  function staffForm(s) {
+    var ps = s ? s.perms : ["closures"];
+    openSheet("<h3>" + (s ? esc(s.label) : "人を追加する") + "</h3>" +
+      (s && s.joined ? '<p class="note">LINE名：' + esc(s.lineName || "—") + (s.lastSeen ? "　最後に開いた日：" + mds(s.lastSeen) : "") + "</p>" : "") +
+      '<label class="f"><span>呼び名（自分用。例：受付さん、朋子）</span><input id="sl" maxlength="30" value="' + esc(s ? s.label : "") + '"></label>' +
+      '<div class="f"><span>できること</span>' +
+      '<label class="check" style="color:var(--mute)"><input type="checkbox" checked disabled>予約表を見る（全員）</label>' +
+      PERM_LABELS.map(function (p) {
+        return '<label class="check"><input type="checkbox" data-perm="' + p[0] + '"' + (ps.indexOf(p[0]) >= 0 ? " checked" : "") + ">" + esc(p[1]) + "</label>";
+      }).join("") + "</div>" +
+      (s ? '<button class="btn wide" id="ss">保存する</button>' : '<button class="btn mint wide" id="ss">招待リンクを作る</button>') +
+      (s && !s.joined ? '<button class="btn line wide" id="sre">招待リンクを出し直す</button>' : "") +
+      (s ? '<div class="danger-zone" style="text-align:center"><button class="link red" id="sdel">この人を外す（管理画面を使えなくする）</button></div>' : "") +
+      '<button class="btn gray wide" id="sn">やめる</button>');
+    var perms = function () { return $$("[data-perm]", $sb).filter(function (x) { return x.checked; }).map(function (x) { return x.getAttribute("data-perm"); }); };
+    $("#sn").onclick = closeSheet;
+    $("#ss").onclick = function () {
+      var label = $("#sl").value.trim();
+      if (!label) { toast(ERR.label_required); return; }
+      if (s) {
+        busy($("#ss"), api("admin_staff_update", { id: s.id, label: label, perms: perms() })).then(function () { closeSheet(); toast("保存しました"); showStaff(); }, fail);
+      } else {
+        busy($("#ss"), api("admin_staff_invite", { label: label, perms: perms() })).then(function (r) { showInvite(label, r); showStaff(); }, fail);
+      }
+    };
+    if ($("#sre")) $("#sre").onclick = function () {
+      busy($("#sre"), api("admin_staff_invite", { id: s.id })).then(function (r) { showInvite(s.label, r); showStaff(); }, fail);
+    };
+    if ($("#sdel")) $("#sdel").onclick = function () {
+      confirmSheet("「" + s.label + "」を外しますか？", "外すと、すぐに管理画面を使えなくなります。また使ってもらうときは、もう一度招待します。", "外す", function () {
+        return api("admin_staff_del", { id: s.id }).then(function () { closeSheet(); toast("外しました"); showStaff(); });
+      });
+    };
+  }
+  function showInvite(label, r) {
+    var url = inviteUrl(r.code);
+    var msg = "LIFE PLUS 予約管理への招待です。\nLINEで開いてください（" + untilText(r.expires) + "まで・1回だけ使えます）\n" + url;
+    openSheet("<h3>招待リンクができました</h3>" +
+      '<p class="note">' + "「" + esc(label) + "」に、LINEで送ってください。" + untilText(r.expires) + "まで使えます。</p>" +
+      '<label class="f"><span>招待リンク</span><input id="iu" readonly value="' + esc(url) + '"></label>' +
+      '<button class="btn mint wide" id="iline">LINEで送る</button>' +
+      '<button class="btn line wide" id="icopy">リンクをコピー</button>' +
+      '<button class="btn gray wide" id="iok">閉じる</button>' +
+      '<p class="note">このリンクを開いた人が参加します。ほかの人に見せないでください。</p>');
+    $("#iok").onclick = closeSheet;
+    $("#icopy").onclick = function () {
+      var done = function () { toast("コピーしました"); };
+      var old = function () { var i = $("#iu"); i.focus(); i.select(); try { document.execCommand("copy"); done(); } catch (_) { toast("長押しでコピーしてください"); } };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, old); else old();
+    };
+    $("#iline").onclick = function () {
+      var share = "https://line.me/R/share?text=" + encodeURIComponent(msg);
+      if (liff.isInClient()) liff.openWindow({ url: share, external: false }); else window.open(share, "_blank");
+    };
+  }
+
+  // 招待リンクから開いた人を参加させる
+  function joinIfInvited() {
+    var m = /[?&]join=([A-Za-z0-9_-]{8,40})/.exec(location.search);
+    if (!m) return Promise.resolve();
+    return api("staff_join", { code: m[1] }).then(function (r) {
+      // リンクの join= だけ消す（もう一度読み込んでも参加し直さない）
+      var rest = location.search.replace(/^\?/, "").split("&").filter(function (x) { return x && x.indexOf("join=") !== 0; }).join("&");
+      try { history.replaceState(null, "", location.pathname + (rest ? "?" + rest : "")); } catch (_) { /* 何もしない */ }
+      if (!r.already) setTimeout(function () { toast("参加しました。これから管理画面を使えます"); }, 600);
+    }, function (e) {
+      if (e.code === "no_token" || e.code === "token_invalid") throw e;
+      var x = new Error(e.code); x.code = e.code; x.join = true; throw x;
+    });
+  }
+
   // ---------- 文字の大きさ（この端末に覚えておく） ----------
   function zoom() { var z = 1; try { z = Number(localStorage.getItem("lp_admin_zoom")) || 1; } catch (_) { /* 何もしない */ } return [1, 1.2, 1.4].indexOf(z) < 0 ? 1 : z; }
   function applyZoom(z) { document.documentElement.style.setProperty("--text-zoom", String(z)); }
@@ -710,13 +865,13 @@
     if (!window.liff || !CFG.LIFF_ID) { $app.innerHTML = '<div class="boot">ページの準備ができていません。</div>'; return; }
     liff.init({ liffId: CFG.LIFF_ID }).then(function () {
       if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
-      return api("admin_init").then(function (d) {
+      return joinIfInvited().then(function () { return api("admin_init"); }).then(function (d) {
         A.init = d; A.date = d.today;
         var q = /[?&]date=(\d{4}-\d{2}-\d{2})/.exec(location.search);
         if (q) A.date = q[1];
         return loadDay(A.date);
       }, function (e) {
-        var code = fail(e);
+        var code = e.join ? e.code : fail(e);
         if (code !== "no_token" && code !== "token_invalid")
           $app.innerHTML = '<div class="boot"><p>' + esc(ERR[code] || ERR.server_error) + '</p><button class="btn" style="max-width:260px" onclick="location.reload()">もう一度読み込む</button></div>';
       });

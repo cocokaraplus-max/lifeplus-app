@@ -124,6 +124,58 @@ Deno.test({ name: "管理画面", sanitizeOps: false, sanitizeResources: false, 
     eq(((await call("hiro", { action: "admin_day", date: "2026-10-26" })).bookings as unknown[]).length, 0);
   });
 
+  await t.step("スタッフ：招待リンクで参加し、選んだことだけできる", async () => {
+    await sql`delete from staff_members`;
+    // HIROさん以外は招待を作れない
+    eq(await code(call("pat", { action: "admin_staff_invite", label: "x" })), "not_admin");
+    const inv = await call("hiro", { action: "admin_staff_invite", label: "受付さん", perms: ["closures", "notify", "hack"] });
+    // まだ参加していない人は開けない
+    eq(await code(call("staff", { action: "admin_init" })), "not_admin");
+    eq(await code(call("staff", { action: "staff_join", code: "wrong" })), "invite_invalid");
+    eq(await code(call("hiro", { action: "staff_join", code: inv.code })), "invite_self");
+    sent.length = 0;
+    eq((await call("staff", { action: "staff_join", code: inv.code })).ok, true);
+    eq(sent[0].to, ["Uhiro"]);
+    // 同じリンクはもう使えない（別の人）
+    eq(await code(call("other", { action: "staff_join", code: inv.code })), "invite_invalid");
+    // 選んだことだけ
+    const me = (await call("staff", { action: "admin_init" })).me as { owner: boolean; perms: string[] };
+    eq([me.owner, me.perms], [false, ["closures", "notify"]]);
+    eq(await code(call("staff", { action: "admin_day", date: "2026-10-19" })), "ok");
+    const add = await call("staff", { action: "admin_closure_add", date: "2026-11-05", note: "研修" });
+    eq(add.ok, true);
+    eq(await code(call("staff", { action: "admin_customers", q: "" })), "no_permission");
+    eq(await code(call("staff", { action: "admin_book", name: "x", menuId: mid("施術（保険）"), startsAt: "2026-11-02T17:00:00+09:00" })), "no_permission");
+    eq(await code(call("staff", { action: "admin_staff" })), "no_permission");
+    eq(await code(call("staff", { action: "admin_staff_invite", label: "y" })), "no_permission");
+    // 通知を選んだ人にも、予約の知らせが届く
+    sent.length = 0;
+    await call("pat", { action: "book", menuId: mid("施術（保険）"), startsAt: "2026-11-02T17:15:00+09:00" });
+    eq(sent[0].to.sort(), ["Uhiro", "Ustaff"]);
+    // HIROさんが権限を変える・外す
+    // deno-lint-ignore no-explicit-any
+    const st = (await call("hiro", { action: "admin_staff" })).staff as any[];
+    eq([st.length, st[0].joined, st[0].lineName, st[0].inviteCode], [1, true, "LINEstaff", null]);
+    await call("hiro", { action: "admin_staff_update", id: st[0].id, label: "受付さん", perms: ["customers"] });
+    eq(await code(call("staff", { action: "admin_customers", q: "" })), "ok");
+    eq(await code(call("staff", { action: "admin_closures" })), "no_permission");
+    await call("hiro", { action: "admin_staff_del", id: st[0].id });
+    eq(await code(call("staff", { action: "admin_init" })), "not_admin");
+  });
+
+  await t.step("スタッフ：期限切れの招待は使えない・出し直せる", async () => {
+    const inv = await call("hiro", { action: "admin_staff_invite", label: "期限さん", perms: ["closures"] });
+    await sql`update staff_members set invite_expires_at = '2026-10-16T11:00:00+09:00' where id = ${inv.id as string}::uuid`;
+    eq(await code(call("late", { action: "staff_join", code: inv.code })), "invite_expired");
+    // deno-lint-ignore no-explicit-any
+    eq(((await call("hiro", { action: "admin_staff" })).staff as any[])[0].inviteExpired, true);
+    const re = await call("hiro", { action: "admin_staff_invite", id: inv.id });
+    eq(await code(call("late", { action: "staff_join", code: inv.code })), "invite_invalid");
+    eq((await call("late", { action: "staff_join", code: re.code })).ok, true);
+    eq((await call("late", { action: "staff_join", code: re.code })).already, true);
+    await sql`delete from staff_members`;
+  });
+
   await sql`update app_settings set value = '' where key = 'admin_line_user_ids'`;
   await sql.end();
 }});

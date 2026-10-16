@@ -1,6 +1,6 @@
 // =============================================================
 // LIFE PLUS 予約  関所（Supabase Edge Function: booking）
-// marker: lifeplus-booking-fn-v1 / admin-notify-v1 / notify-contact-v1 / admin-api-v1
+// marker: lifeplus-booking-fn-v1 / admin-notify-v1 / notify-contact-v1 / admin-api-v1 / staff-perms-v1
 //
 // 予約ページ（LIFF）からの依頼は、すべてここを通る。
 //   1. LINE の ID トークンを LINE 本体に問い合わせて、本人を確かめる
@@ -123,7 +123,48 @@ async function adminIds(sql: Sql): Promise<string[]> {
   return String(r[0]?.value ?? "").split(",").map((x) => x.trim()).filter(Boolean);
 }
 
+// ---------- 管理画面を使える人  marker: staff-perms-v1 ----------
+export const PERMS = ["closures", "bookings", "customers", "notify"] as const;
+// 操作ごとに要る権限（null は全員、owner はHIROさんだけ）
+const PERM_OF: Record<string, string | null> = {
+  admin_init: null, admin_day: null, admin_month: null, admin_pending: null,
+  admin_closures: "closures", admin_closure_add: "closures", admin_closure_del: "closures",
+  admin_decide: "bookings", admin_outcome: "bookings", admin_cancel: "bookings", admin_slots: "bookings", admin_book: "bookings",
+  admin_customers: "customers", admin_customer: "customers", admin_customer_update: "customers", admin_message: "customers",
+};
+interface Me { owner: boolean; perms: string[]; label: string; staffId: string | null }
+async function staffOf(sql: Sql, sub: string): Promise<Me | null> {
+  if ((await adminIds(sql)).includes(sub)) return { owner: true, perms: [...PERMS], label: "HIRO", staffId: null };
+  const r = await sql`update staff_members set last_seen_at = now() where line_user_id = ${sub} returning id, label, perms`;
+  if (!r.length) return null;
+  return { owner: false, perms: r[0].perms ?? [], label: r[0].label, staffId: r[0].id };
+}
+function cleanPerms(v: unknown): string[] {
+  return Array.isArray(v) ? PERMS.filter((p) => v.includes(p)) : [];
+}
+function newInviteCode(): string {
+  const b = new Uint8Array(16);
+  crypto.getRandomValues(b);
+  return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+const INVITE_HOURS = 72;
+
+async function notifyIds(sql: Sql): Promise<string[]> {
+  const s = await sql`select line_user_id from staff_members where line_user_id is not null and 'notify' = any(perms)`;
+  return [...new Set([...(await adminIds(sql)), ...s.map((r: Record<string, unknown>) => String(r.line_user_id))])];
+}
+
 async function tellAdmin(deps: Deps, text: string) {
+  if (!deps.notify) return;
+  try {
+    const to = await notifyIds(deps.sql);
+    if (to.length) await deps.notify(to, text);
+  } catch (e) {
+    console.error("notify failed", e);
+  }
+}
+
+async function tellOwner(deps: Deps, text: string) {
   if (!deps.notify) return;
   try {
     const to = await adminIds(deps.sql);
@@ -184,11 +225,35 @@ export async function handle(body: any, deps: Deps): Promise<Record<string, unkn
   const who = await deps.verifyIdToken(token);
   if (!who || !who.sub) throw new ApiError("token_invalid", 401);
 
-  // 管理画面（HIROさんだけ）
+  // 招待リンクを開いた人が、管理画面の仲間に入る
+  if (body.action === "staff_join") {
+    const code = str(body.code, 40);
+    if (!code) throw new ApiError("invite_invalid");
+    if ((await adminIds(sql)).includes(who.sub)) throw new ApiError("invite_self", 409);
+    const mine = await sql`select id from staff_members where line_user_id = ${who.sub}`;
+    const inv = await sql`select id, invite_expires_at from staff_members where invite_code = ${code} and line_user_id is null`;
+    if (!inv.length) {
+      if (mine.length) return { ok: true, already: true };
+      throw new ApiError("invite_invalid", 404);
+    }
+    if ((inv[0].invite_expires_at as Date).getTime() < now.getTime()) throw new ApiError("invite_expired", 410);
+    if (mine.length) throw new ApiError("invite_already_staff", 409);
+    await sql`update staff_members set line_user_id = ${who.sub}, line_name = ${str(who.name ?? "", 60) || null},
+      joined_at = ${now.toISOString()}::timestamptz, invite_code = null, invite_expires_at = null where id = ${inv[0].id}`;
+    const r = await sql`select label from staff_members where id = ${inv[0].id}`;
+    await tellOwner(deps, `【管理画面】「${r[0].label}」が参加しました（LINE名：${who.name ?? "—"}）`);
+    return { ok: true };
+  }
+
+  // 管理画面（HIROさんと、HIROさんが招待した人）
   if (typeof body.action === "string" && body.action.startsWith("admin_")) {
-    const ids = await adminIds(sql);
-    if (!ids.includes(who.sub)) throw new ApiError("not_admin", 403);
-    return await handleAdmin(body, deps, now);
+    const me = await staffOf(sql, who.sub);
+    if (!me) throw new ApiError("not_admin", 403);
+    const need = body.action in PERM_OF ? PERM_OF[body.action] : "owner";
+    if (need === "owner" ? !me.owner : need !== null && !me.perms.includes(need)) throw new ApiError("no_permission", 403);
+    const out = await handleAdmin(body, deps, now);
+    if (body.action === "admin_init") out.me = { owner: me.owner, perms: me.perms, label: me.label };
+    return out;
   }
 
   const cust = await getOrCreateCustomer(sql, who);
@@ -502,6 +567,32 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
       };
     }
 
+    // ひと月の予約の数（予約表のカレンダー）  marker: admin-month-v1
+    case "admin_month": {
+      const ym = str(body.month, 7);
+      if (!/^\d{4}-\d{2}$/.test(ym)) throw new ApiError("bad_request");
+      const first = ym + "-01";
+      const next = addDays(addDays(first, 31).slice(0, 7) + "-01", 0);
+      const s = dayRange(first).start, e = dayRange(next).start;
+      const bk = await sql`
+        select to_char(starts_at at time zone 'Asia/Tokyo', 'YYYY-MM-DD') as d,
+               count(*) filter (where status in ('pending','confirmed','done','no_show','late_cancel'))::int as n,
+               count(*) filter (where status = 'pending')::int as p
+        from bookings where starts_at >= ${s}::timestamptz and starts_at < ${e}::timestamptz group by 1`;
+      const cl = await sql`select starts_at, ends_at from closures where tstzrange(starts_at, ends_at, '[)') && tstzrange(${s}::timestamptz, ${e}::timestamptz, '[)')`;
+      const hours = await sql`select distinct weekday from business_hours`;
+      const openW = new Set(hours.map((h: Record<string, unknown>) => Number(h.weekday)));
+      const days = [];
+      for (let d = first; d < next; d = addDays(d, 1)) {
+        const r = dayRange(d);
+        const b = bk.find((x: Record<string, unknown>) => x.d === d);
+        const whole = cl.some((c: Record<string, unknown>) => (c.starts_at as Date).toISOString() <= r.start && (c.ends_at as Date).toISOString() >= r.end);
+        const part = !whole && cl.some((c: Record<string, unknown>) => (c.starts_at as Date).toISOString() < r.end && (c.ends_at as Date).toISOString() > r.start);
+        days.push({ date: d, open: openW.has(isoWeekday(d)), count: b ? b.n : 0, pending: b ? b.p : 0, off: whole ? "all" : part ? "part" : "" });
+      }
+      return { month: ym, lead: isoWeekday(first) % 7, days };
+    }
+
     case "admin_pending": {
       return { bookings: await bookingsWhere(sql, sql`b.status = 'pending' and b.ends_at > ${now.toISOString()}::timestamptz`) };
     }
@@ -692,6 +783,53 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
         sent = await tellPatient(deps, b.line_user_id, `【ご予約を承りました】\n${whenText(b.starts_at)}\n${b.business_name}　${b.menu_name}\n当日お待ちしております。${TAIL}`);
       }
       return { ok: true, id, sent };
+    }
+
+    // 管理画面を使える人（HIROさんだけが触れる）
+    case "admin_staff": {
+      const rows = await sql`select * from staff_members order by created_at`;
+      return {
+        staff: rows.map((s: Record<string, unknown>) => ({
+          id: s.id, label: s.label, lineName: s.line_name ?? "", perms: s.perms ?? [], joined: !!s.line_user_id,
+          inviteCode: s.line_user_id ? null : s.invite_code,
+          inviteExpires: s.invite_expires_at ? (s.invite_expires_at as Date).toISOString() : null,
+          inviteExpired: !s.line_user_id && (!s.invite_expires_at || (s.invite_expires_at as Date).getTime() < now.getTime()),
+          lastSeen: s.last_seen_at ? jstDate(s.last_seen_at as Date) : null,
+        })),
+      };
+    }
+    // 招待リンクを作る（id があれば、まだ参加していない人のリンクを出し直す）
+    case "admin_staff_invite": {
+      const code = newInviteCode();
+      const exp = new Date(now.getTime() + INVITE_HOURS * 3600000).toISOString();
+      const id = str(body.id, 40);
+      if (id) {
+        if (!UUID_RE.test(id)) throw new ApiError("bad_request");
+        const r = await sql`update staff_members set invite_code = ${code}, invite_expires_at = ${exp}::timestamptz
+          where id = ${id}::uuid and line_user_id is null returning id`;
+        if (!r.length) throw new ApiError("staff_not_found", 404);
+        return { ok: true, id, code, expires: exp };
+      }
+      const label = str(body.label, 30);
+      if (!label) throw new ApiError("label_required");
+      const r = await sql`insert into staff_members (label, perms, invite_code, invite_expires_at)
+        values (${label}, ${cleanPerms(body.perms)}::text[], ${code}, ${exp}::timestamptz) returning id`;
+      return { ok: true, id: r[0].id, code, expires: exp };
+    }
+    case "admin_staff_update": {
+      const id = str(body.id, 40);
+      if (!UUID_RE.test(id)) throw new ApiError("bad_request");
+      const label = str(body.label, 30);
+      if (!label) throw new ApiError("label_required");
+      const r = await sql`update staff_members set label = ${label}, perms = ${cleanPerms(body.perms)}::text[] where id = ${id}::uuid returning id`;
+      if (!r.length) throw new ApiError("staff_not_found", 404);
+      return { ok: true };
+    }
+    case "admin_staff_del": {
+      const id = str(body.id, 40);
+      if (!UUID_RE.test(id)) throw new ApiError("bad_request");
+      await sql`delete from staff_members where id = ${id}::uuid`;
+      return { ok: true };
     }
 
     default:
