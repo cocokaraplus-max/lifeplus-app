@@ -168,7 +168,7 @@ insert into business_hours (weekday, open_time, close_time) values
   (1, '17:00', '20:00'),   -- 月
   (4, '17:00', '20:00'),   -- 木
   (6, '09:00', '12:00')    -- 土
-on conflict (weekday, open_time) do nothing;
+on conflict do nothing;   -- lifeplus-hours-kind-v1: 一意の組み合わせが (weekday, kind, open_time) に変わったので、列を指定しない
 
 -- ---------- 確認（これが結果として返る） ----------
 select

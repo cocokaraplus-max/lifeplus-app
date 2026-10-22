@@ -23,3 +23,11 @@ LINE（LIFF）から開く予約ページと、その裏の関所。TASUKARU と
 TEST_DB_URL=postgres://... deno test -A tests/booking_test.ts   # 関所 16項目
 deno run -A tests/e2e_server.ts & python3 tests/e2e_test.py      # 画面 11項目
 ```
+
+## 2026-10-22 設定画面・手入力だけの時間（marker: lifeplus-settings-v1 / lifeplus-hours-kind-v1）
+- 管理画面に「設定」タブ（HIROさんだけ）：曜日ごとの受付時間と、予約の決まりごと（締め切り・何日先まで・ドタキャンの回数）
+- 受付時間に種類：**見せる**（お客さまの予約ページで選べる）／**手入力だけ**（予約表にうっすら出て、管理画面から手で入れるときだけ選べる。知り合いなど）
+- 手で予約を入れるときは「受付時間の外も出す」で、6時〜23時の空いている時間も選べる
+- 表の直し：`sql/lifeplus_hours_v2.sql`（business_hours に kind。お客さまの空き枠は kind='public' だけ）
+- 確かめ：`tests/settings_test.ts`（関所 9項目）・`tests/e2e_settings_test.py`（画面 16項目）
+  ★空き枠は DB の now() で決まるので、テスト用DBでは now() をテストの「今」（2026-10-16 12:00）にそろえてから流す

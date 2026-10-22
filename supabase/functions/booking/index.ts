@@ -174,6 +174,22 @@ async function tellOwner(deps: Deps, text: string) {
   }
 }
 
+// lifeplus-settings-v1: 設定画面へ返すもの
+const HM15_RE = /^([01]\d|2[0-4]):(00|15|30|45)$/;
+function hmMin(t: string) { const p = t.split(":"); return Number(p[0]) * 60 + Number(p[1]); }
+async function settingsOut(sql: Sql) {
+  const hours = await sql`select weekday, kind, to_char(open_time,'HH24:MI') as o, to_char(close_time,'HH24:MI') as c from business_hours order by weekday, open_time`;
+  const rows = await sql`select key, value from app_settings where key in ('lead_minutes','horizon_days','noshow_limit')`;
+  const m: Record<string, string> = {};
+  for (const r of rows) m[r.key] = r.value;
+  return {
+    hours: hours.map((h: Record<string, unknown>) => ({ weekday: Number(h.weekday), kind: h.kind, open: h.o, close: h.c === "00:00" ? "24:00" : h.c })),
+    leadMinutes: Number(m.lead_minutes ?? 60),
+    horizonDays: Number(m.horizon_days ?? 60),
+    noshowLimit: Number(m.noshow_limit ?? 2),
+  };
+}
+
 async function settings(sql: Sql) {
   const rows = await sql`select key, value from app_settings`;
   const m: Record<string, string> = {};
@@ -306,7 +322,8 @@ export async function handle(body: any, deps: Deps): Promise<Record<string, unkn
       if (!DATE_RE.test(from) || from < today) from = today;
       const st = await settings(sql);
       const last = addDays(today, st.horizonDays);
-      const hours = await sql`select distinct weekday from business_hours`;
+      // lifeplus-hours-kind-v1: お客さまに見せる受付時間（public）だけ
+      const hours = await sql`select distinct weekday from business_hours where kind = 'public'`;
       const openW = new Set(hours.map((h: Record<string, unknown>) => Number(h.weekday)));
 
       const dates: string[] = [];
@@ -530,13 +547,13 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
         select m.id, m.business_id, m.name, m.duration_min, m.buffer_after_min, m.price_yen
         from menus m join businesses b on b.id = m.business_id where m.is_active and b.accepts_booking
         order by b.sort_order, m.sort_order`;
-      const hours = await sql`select weekday, to_char(open_time,'HH24:MI') as o, to_char(close_time,'HH24:MI') as c from business_hours order by weekday, open_time`;
+      const hours = await sql`select weekday, kind, to_char(open_time,'HH24:MI') as o, to_char(close_time,'HH24:MI') as c from business_hours order by weekday, open_time`;  // lifeplus-hours-kind-v1
       const pend = await sql`select count(*)::int as n from bookings where status = 'pending' and ends_at > ${now.toISOString()}::timestamptz`;
       return {
         today: jstDate(now),
         businesses: businesses.map((b: Record<string, unknown>) => ({ id: b.id, name: b.name })),
         menus: menus.map((m: Record<string, unknown>) => ({ id: m.id, businessId: m.business_id, name: m.name, durationMin: m.duration_min, bufferMin: m.buffer_after_min, priceYen: m.price_yen })),
-        hours: hours.map((h: Record<string, unknown>) => ({ weekday: Number(h.weekday), open: h.o, close: h.c })),
+        hours: hours.map((h: Record<string, unknown>) => ({ weekday: Number(h.weekday), kind: h.kind, open: h.o, close: h.c })),
         pendingCount: pend[0].n,
         symptoms: SYMPTOMS,
       };
@@ -550,7 +567,8 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
       const closures = await sql`
         select id, starts_at, ends_at, note from closures
         where tstzrange(starts_at, ends_at, '[)') && tstzrange(${start}::timestamptz, ${end}::timestamptz, '[)') order by starts_at`;
-      const hours = await sql`select to_char(open_time,'HH24:MI') as o, to_char(close_time,'HH24:MI') as c from business_hours where weekday = ${isoWeekday(d)} order by open_time`;
+      // lifeplus-hours-kind-v1: hours＝お客さまに見せる受付時間、staffHours＝手入力だけの時間（予約表にうっすら出す）
+      const hours = await sql`select kind, to_char(open_time,'HH24:MI') as o, to_char(close_time,'HH24:MI') as c from business_hours where weekday = ${isoWeekday(d)} order by open_time`;
       const pend = await sql`select count(*)::int as n from bookings where status = 'pending' and ends_at > ${now.toISOString()}::timestamptz`;
       return {
         date: d, weekday: WEEKDAYS[isoWeekday(d) % 7], bookings: list,
@@ -562,7 +580,8 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
             startDate: jstDate(s), endDate: jstDate(new Date(e.getTime() - 1)),
           };
         }),
-        hours: hours.map((h: Record<string, unknown>) => ({ open: h.o, close: h.c })),
+        hours: hours.filter((h: Record<string, unknown>) => h.kind === "public").map((h: Record<string, unknown>) => ({ open: h.o, close: h.c })),
+        staffHours: hours.filter((h: Record<string, unknown>) => h.kind === "staff").map((h: Record<string, unknown>) => ({ open: h.o, close: h.c })),
         pendingCount: pend[0].n,
       };
     }
@@ -580,15 +599,16 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
                count(*) filter (where status = 'pending')::int as p
         from bookings where starts_at >= ${s}::timestamptz and starts_at < ${e}::timestamptz group by 1`;
       const cl = await sql`select starts_at, ends_at from closures where tstzrange(starts_at, ends_at, '[)') && tstzrange(${s}::timestamptz, ${e}::timestamptz, '[)')`;
-      const hours = await sql`select distinct weekday from business_hours`;
-      const openW = new Set(hours.map((h: Record<string, unknown>) => Number(h.weekday)));
+      const hours = await sql`select distinct weekday, kind from business_hours`;  // lifeplus-hours-kind-v1
+      const openW = new Set(hours.filter((h: Record<string, unknown>) => h.kind === "public").map((h: Record<string, unknown>) => Number(h.weekday)));
+      const staffW = new Set(hours.filter((h: Record<string, unknown>) => h.kind === "staff").map((h: Record<string, unknown>) => Number(h.weekday)));
       const days = [];
       for (let d = first; d < next; d = addDays(d, 1)) {
         const r = dayRange(d);
         const b = bk.find((x: Record<string, unknown>) => x.d === d);
         const whole = cl.some((c: Record<string, unknown>) => (c.starts_at as Date).toISOString() <= r.start && (c.ends_at as Date).toISOString() >= r.end);
         const part = !whole && cl.some((c: Record<string, unknown>) => (c.starts_at as Date).toISOString() < r.end && (c.ends_at as Date).toISOString() > r.start);
-        days.push({ date: d, open: openW.has(isoWeekday(d)), count: b ? b.n : 0, pending: b ? b.p : 0, off: whole ? "all" : part ? "part" : "" });
+        days.push({ date: d, open: openW.has(isoWeekday(d)), staff: staffW.has(isoWeekday(d)), count: b ? b.n : 0, pending: b ? b.p : 0, off: whole ? "all" : part ? "part" : "" });
       }
       return { month: ym, lead: isoWeekday(first) % 7, days };
     }
@@ -741,18 +761,27 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
 
     // 手で予約を入れる（電話・来院で受けたもの）
     case "admin_slots": {
+      // lifeplus-hours-kind-v1: 手で入れるときの候補。
+      //   public＝お客さまに見せる受付時間／staff＝手入力だけの時間／other＝それ以外（any のときだけ・6時〜23時）
+      //   ★同じ時刻が重なったら public → staff → other の順で1つにする
       const d = str(body.date, 10), menuId = str(body.menuId, 40);
       if (!DATE_RE.test(d) || !UUID_RE.test(menuId)) throw new ApiError("bad_request");
+      const any = body.any === true;
       const rows = await sql`
         with m as (select duration_min, buffer_after_min from menus where id = ${menuId}::uuid),
-        h as (select ((${d}::date + open_time) at time zone 'Asia/Tokyo') as op, ((${d}::date + close_time) at time zone 'Asia/Tokyo') as cl from business_hours where weekday = ${isoWeekday(d)}),
-        c as (select gs as s, gs + make_interval(mins => m.duration_min + m.buffer_after_min) as b
-              from h, m, generate_series(h.op, h.cl - make_interval(mins => m.duration_min), interval '15 minutes') gs)
-        select c.s from c where not exists (
+        h as (select kind, ((${d}::date + open_time) at time zone 'Asia/Tokyo') as op, ((${d}::date + close_time) at time zone 'Asia/Tokyo') as cl
+                from business_hours where weekday = ${isoWeekday(d)}
+              union all
+              select 'other', ((${d}::date + time '06:00') at time zone 'Asia/Tokyo'), ((${d}::date + time '23:00') at time zone 'Asia/Tokyo') where ${any}),
+        c as (select h.kind, gs as s, gs + make_interval(mins => m.duration_min + m.buffer_after_min) as b
+              from h, m, generate_series(h.op, h.cl - make_interval(mins => m.duration_min), interval '15 minutes') gs),
+        c2 as (select distinct on (c.s) c.s, c.b, c.kind from c
+               order by c.s, case c.kind when 'public' then 0 when 'staff' then 1 else 2 end)
+        select c2.s, c2.kind from c2 where not exists (
           select 1 from bookings bk where bk.status in ('pending','confirmed')
-            and tstzrange(bk.starts_at, bk.block_until, '[)') && tstzrange(c.s, c.b, '[)'))
-        order by c.s`;
-      return { slots: rows.map((r: Record<string, unknown>) => ({ startsAt: (r.s as Date).toISOString(), time: jstTime(r.s as Date) })) };
+            and tstzrange(bk.starts_at, bk.block_until, '[)') && tstzrange(c2.s, c2.b, '[)'))
+        order by c2.s`;
+      return { slots: rows.map((r: Record<string, unknown>) => ({ startsAt: (r.s as Date).toISOString(), time: jstTime(r.s as Date), kind: r.kind })) };
     }
     case "admin_book": {
       const menuId = str(body.menuId, 40);
@@ -783,6 +812,42 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
         sent = await tellPatient(deps, b.line_user_id, `【ご予約を承りました】\n${whenText(b.starts_at)}\n${b.business_name}　${b.menu_name}\n当日お待ちしております。${TAIL}`);
       }
       return { ok: true, id, sent };
+    }
+
+    // 設定（HIROさんだけ）  marker: lifeplus-settings-v1
+    //   受付時間（曜日ごと・種類つき）と、予約の決まりごと（締め切り・何日先まで・ドタキャンの回数）
+    case "admin_settings": {
+      return await settingsOut(sql);
+    }
+    case "admin_settings_save": {
+      const list = Array.isArray(body.hours) ? body.hours : null;
+      if (!list || list.length > 40) throw new ApiError("bad_request");
+      const hours: { weekday: number; kind: string; open: string; close: string }[] = [];
+      for (const x of list) {
+        const w = Number(x && x.weekday), kind = String(x && x.kind), o = str(x && x.open, 5), c = str(x && x.close, 5);
+        if (!(w >= 1 && w <= 7) || (kind !== "public" && kind !== "staff") || !HM15_RE.test(o) || !HM15_RE.test(c)) throw new ApiError("hours_invalid");
+        if (hmMin(o) >= hmMin(c) || hmMin(c) > 24 * 60) throw new ApiError("hours_invalid");
+        hours.push({ weekday: w, kind, open: o, close: c });
+      }
+      // 同じ曜日の時間どうしは、種類が違っても重ねない（どちらの時間か分からなくなるため）
+      for (const a of hours) for (const b of hours) {
+        if (a !== b && a.weekday === b.weekday && hmMin(a.open) < hmMin(b.close) && hmMin(b.open) < hmMin(a.close)) throw new ApiError("hours_overlap");
+      }
+      const lead = Number(body.leadMinutes), horizon = Number(body.horizonDays), noshow = Number(body.noshowLimit);
+      if (!Number.isInteger(lead) || lead < 0 || lead > 2880) throw new ApiError("settings_invalid");
+      if (!Number.isInteger(horizon) || horizon < 1 || horizon > 365) throw new ApiError("settings_invalid");
+      if (!Number.isInteger(noshow) || noshow < 1 || noshow > 10) throw new ApiError("settings_invalid");
+      await sql.begin(async (tx: Sql) => {
+        await tx`delete from business_hours`;
+        for (const h of hours) {
+          await tx`insert into business_hours (weekday, kind, open_time, close_time)
+                   values (${h.weekday}, ${h.kind}, ${h.open}::time, ${h.close === "24:00" ? "24:00:00" : h.close}::time)`;
+        }
+        for (const [k, v] of [["lead_minutes", lead], ["horizon_days", horizon], ["noshow_limit", noshow]] as [string, number][]) {
+          await tx`insert into app_settings (key, value) values (${k}, ${String(v)}) on conflict (key) do update set value = excluded.value`;
+        }
+      });
+      return await settingsOut(sql);
     }
 
     // 消す（HIROさんだけ。テストで入れた人など）  marker: admin-delete-v1

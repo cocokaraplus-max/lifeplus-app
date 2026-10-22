@@ -46,6 +46,10 @@
     bad_request: "うまく送れませんでした。入力を確かめてください。",
     server_error: "うまく送れませんでした。少しおいてお試しください。",
     network: "通信がうまくいきませんでした。電波の良いところでもう一度お試しください。",
+    // lifeplus-settings-v1
+    hours_invalid: "時間の入れ方がおかしいところがあります（15分きざみ・終わりは始まりより後）。",
+    hours_overlap: "同じ曜日で重なっている時間があります。重ならないようにしてください。",
+    settings_invalid: "決まりごとの数字がおかしいところがあります。",
   };
   var WD = ["日", "月", "火", "水", "木", "金", "土"];
   var STATUS = { pending: "確認待ち", confirmed: "確定", done: "来院済み", no_show: "無断キャンセル", late_cancel: "直前キャンセル", cancelled: "取消", rejected: "お断り" };
@@ -81,9 +85,14 @@
     if (d.length === 10) return d.slice(0, 2) === "03" || d.slice(0, 2) === "06" ? d.slice(0, 2) + "-" + d.slice(2, 6) + "-" + d.slice(6) : d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6);
     return p || "";
   }
+  // lifeplus-hours-kind-v1: hoursOf＝お客さまに見せる受付時間、staffHoursOf＝手入力だけの時間
   function hoursOf(ymd) {
     var w = wdOf(ymd) === 0 ? 7 : wdOf(ymd);
-    return (A.init.hours || []).filter(function (h) { return h.weekday === w; });
+    return (A.init.hours || []).filter(function (h) { return h.weekday === w && (h.kind || "public") === "public"; });
+  }
+  function staffHoursOf(ymd) {
+    var w = wdOf(ymd) === 0 ? 7 : wdOf(ymd);
+    return (A.init.hours || []).filter(function (h) { return h.weekday === w && h.kind === "staff"; });
   }
   // できること（HIROさんは全部）
   function can(p) { var me = A.init && A.init.me; return !!me && (me.owner || me.perms.indexOf(p) >= 0); }
@@ -147,6 +156,7 @@
     off: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M6 6l12 12"/></svg>',
     cust: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.6.9 2.6 2.6 3 5.2"/></svg>',
     staff: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/><path d="M19 3v5M16.5 5.5h5"/></svg>',
+    set: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>',
   };
   function sizes() {
     return '<div class="sizes" role="group" aria-label="文字の大きさ">' +
@@ -156,8 +166,8 @@
   }
   function frame(barInner, mainHtml, extra) {
     var pc = A.day ? A.day.pendingCount : A.init.pendingCount;
-    var tabs = [["day", "予約表"], ["pending", "確認待ち"], ["off", "休み"], ["cust", "お客さま"], ["staff", "スタッフ"]].filter(function (t) {
-      return t[0] === "off" ? can("closures") : t[0] === "cust" ? can("customers") : t[0] === "staff" ? owner() : true;
+    var tabs = [["day", "予約表"], ["pending", "確認待ち"], ["off", "休み"], ["cust", "お客さま"], ["staff", "スタッフ"], ["set", "設定"]].filter(function (t) {
+      return t[0] === "off" ? can("closures") : t[0] === "cust" ? can("customers") : t[0] === "staff" || t[0] === "set" ? owner() : true;
     }).map(function (t) {
       return '<button data-tab="' + t[0] + '" class="' + (A.tab === t[0] ? "on" : "") + '"' + (A.tab === t[0] ? ' aria-current="page"' : "") + ">" +
         ICONS[t[0]] + t[1] + (t[0] === "pending" && pc ? '<span class="badge">' + pc + "</span>" : "") + "</button>";
@@ -175,6 +185,7 @@
     if (tab === "pending") return showPending();
     if (tab === "off") return showOff();
     if (tab === "staff") return showStaff();
+    if (tab === "set") return showSettings();   // lifeplus-settings-v1
     return showCustomers();
   }
   function loadingMain(title) {
@@ -192,24 +203,28 @@
 
   function renderDay() {
     var d = A.day, bs = d.bookings, live = bs.filter(function (b) { return b.status === "pending" || b.status === "confirmed"; });
-    var hours = d.hours;
+    var hours = d.hours, sh = d.staffHours || [];   // lifeplus-hours-kind-v1
     var bar =
       '<div class="day"><button class="arrow" id="dp" aria-label="前の日">‹</button>' +
       "<h1>" + mdj(d.date) + "<small>（" + esc(d.weekday) + "）</small></h1>" +
       (d.date !== A.init.today ? '<button class="today-btn" id="dt">今日</button>' : "") +
       '<button class="today-btn" id="dm" aria-label="カレンダーで日を選ぶ">月</button>' +
       '<button class="arrow" id="dn" aria-label="次の日">›</button></div>' +
-      '<div class="sub">' + (hours.length ? hours.map(function (h) { return h.open + "〜" + h.close; }).join("・") + "　予約 " + live.length + "件" : "受付のない曜日です") + "</div>";
+      '<div class="sub">' + (hours.length || sh.length ?
+        (hours.length ? hours.map(function (h) { return h.open + "〜" + h.close; }).join("・") : "受付なし") +
+        (sh.length ? '<span class="sub-staff">　手入力だけ ' + sh.map(function (h) { return h.open + "〜" + h.close; }).join("・") + "</span>" : "") +
+        "　予約 " + live.length + "件" : "受付のない曜日です") + "</div>";
 
     var h = "";
     if (d.pendingCount) {
       h += '<button class="wait" id="gowait"><span class="n">' + d.pendingCount + '</span><span class="t">確認待ちの予約があります<br>（初めての方・仮予約）</span><span class="go">見る</span></button>';
     }
-    if (!hours.length) {
+    if (!hours.length && !sh.length) {
       h += '<div class="closed-day">この曜日は受付時間がありません。</div>';
       if (bs.length) h += bs.map(cardOf).join("");
     } else {
-      h += '<div class="legend"><span><i class="sw mo"></i>接骨院</span><span><i class="sw bc"></i>ボディケア</span><span><i class="sw pd"></i>確認待ち</span><span><i class="sw x"></i>×（受けない）</span></div>';
+      h += '<div class="legend"><span><i class="sw mo"></i>接骨院</span><span><i class="sw bc"></i>ボディケア</span><span><i class="sw pd"></i>確認待ち</span><span><i class="sw x"></i>×（受けない）</span>' +
+        (sh.length ? '<span><i class="sw st"></i>手入力だけ（お客さまには見えない）</span>' : "") + "</div>";
       h += timeline(d);
       if (can("bookings") || can("closures")) h += '<p class="note">空いている枠を押すと、' + (can("bookings") && can("closures") ? "予約を入れたり×にしたり" : can("bookings") ? "予約を入れることが" : "×にすることが") + "できます。</p>";
     }
@@ -221,18 +236,20 @@
     if ($("#gowait")) $("#gowait").onclick = function () { go("pending"); };
     if ($("#fab")) $("#fab").onclick = function () { bookForm({ date: A.date }); };
     on("[data-bk]", function (el) { slip(el.getAttribute("data-bk")); });
-    on("[data-free]", function (el) { freeSlot(el.getAttribute("data-free")); });
+    on("[data-free]", function (el) { freeSlot(el.getAttribute("data-free"), el.getAttribute("data-staff") === "1"); });
     on("button[data-x]", function (el) { xSheet(el.getAttribute("data-x")); });
   }
 
   function timeline(d) {
-    var open = Math.min.apply(null, d.hours.map(function (h) { return toMin(h.open); }));
-    var close = Math.max.apply(null, d.hours.map(function (h) { return toMin(h.close); }));
+    var allH = d.hours.concat(d.staffHours || []);   // lifeplus-hours-kind-v1: 手入力だけの時間も表に入れる
+    var open = Math.min.apply(null, allH.map(function (h) { return toMin(h.open); }));
+    var close = Math.max.apply(null, allH.map(function (h) { return toMin(h.close); }));
     // 時間外の予約（手入力など）もはみ出さないように広げる
     d.bookings.forEach(function (b) { open = Math.min(open, toMin(b.time)); close = Math.max(close, toMin(b.blockUntil) || toMin(b.endTime)); });
     open = Math.floor(open / 15) * 15; close = Math.ceil(close / 15) * 15;
     var y = function (m) { return (m - open) / 15 * ROW; };
     var inHours = function (m) { return d.hours.some(function (h) { return m >= toMin(h.open) && m + 15 <= toMin(h.close); }); };
+    var inStaff = function (m) { return (d.staffHours || []).some(function (h) { return m >= toMin(h.open) && m + 15 <= toMin(h.close); }); };
     var busyAt = function (m) {
       return d.bookings.some(function (b) {
         if (b.status === "cancelled" || b.status === "rejected") return false;
@@ -243,8 +260,10 @@
     };
     var h = '<div class="tl" style="height:' + (y(close) + 10) + 'px">';
     for (var m = open; m < close; m += 15) {
-      h += '<div class="row' + (m % 60 === 0 ? " hour" : "") + '" style="position:absolute;left:0;right:0;top:' + y(m) + 'px"><span class="lb">' + hm(m) + "</span>" +
-        (inHours(m) && !busyAt(m) && (can("bookings") || can("closures")) ? '<button class="free" data-free="' + hm(m) + '" aria-label="' + hm(m) + ' 空き">空き</button>' : "") + "</div>";
+      var st = !inHours(m) && inStaff(m);
+      h += '<div class="row' + (m % 60 === 0 ? " hour" : "") + (st ? " staff" : !inHours(m) ? " outside" : "") + '" style="position:absolute;left:0;right:0;top:' + y(m) + 'px"><span class="lb">' + hm(m) + "</span>" +
+        (inHours(m) && !busyAt(m) && (can("bookings") || can("closures")) ? '<button class="free" data-free="' + hm(m) + '" aria-label="' + hm(m) + ' 空き">空き</button>' : "") +
+        (st && !busyAt(m) && can("bookings") ? '<button class="free staff" data-free="' + hm(m) + '" data-staff="1" aria-label="' + hm(m) + ' 手入力だけ">手入力だけ</button>' : "") + "</div>";
     }
     h += '<div class="row hour end" style="position:absolute;left:0;right:0;top:' + y(close) + 'px"><span class="lb">' + hm(close) + "</span></div>";
     d.closures.forEach(function (c) {
@@ -291,7 +310,7 @@
       WD.forEach(function (w, i) { h += '<span class="cal-wd' + (i === 0 ? " sun" : i === 6 ? " sat" : "") + '">' + w + "</span>"; });
       for (var i = 0; i < r.lead; i++) h += "<span></span>";
       r.days.forEach(function (d) {
-        var cls = d.off === "all" ? "closed" : !d.open && !d.count ? "none" : d.off === "part" ? "part" : "open";
+        var cls = d.off === "all" ? "closed" : !d.open && !d.staff && !d.count ? "none" : !d.open && !d.count ? "staffday" : d.off === "part" ? "part" : "open";   // lifeplus-hours-kind-v1
         var mark = d.off === "all" ? "休" : d.count ? d.count + "件" : "";
         h += '<button class="cal-d ' + cls + (d.date === A.init.today ? " today" : "") + (d.date === A.date ? " sel" : "") + '" data-md="' + d.date + '" aria-label="' + dayText(d.date) + (mark ? " " + mark : "") + '">' +
           Number(d.date.slice(8)) + "<i>" + mark + "</i>" + (d.pending ? '<b class="dot" aria-hidden="true"></b>' : "") + "</button>";
@@ -307,8 +326,15 @@
   }
 
   // 空き枠を押したとき
-  function freeSlot(t) {
+  function freeSlot(t, staff) {
     var m = toMin(t), d = A.day;
+    if (staff) {   // lifeplus-hours-kind-v1: 手入力だけの時間は、予約を入れるだけ（お客さまには見えないので×は要らない）
+      openSheet("<h3>" + dayText(d.date) + " " + esc(t) + "</h3>" +
+        '<p class="note">手入力だけの時間です。お客さまの予約ページには出ません。知り合いなどを入れるときに使います。</p>' +
+        '<button class="btn mint wide" id="fb">ここに予約を入れる</button>');
+      $("#fb").onclick = function () { bookForm({ date: d.date, time: t, any: false }); };
+      return;
+    }
     var close = Math.max.apply(null, d.hours.filter(function (h) { return toMin(h.open) <= m; }).map(function (h) { return toMin(h.close); }));
     openSheet(
       "<h3>" + dayText(d.date) + " " + esc(t) + "</h3>" +
@@ -691,8 +717,9 @@
       '<label class="f"><span>メニュー</span><select id="bm">' + menuOpts + "</select></label>" +
       '<label class="f"><span>日にち</span><input type="date" id="bd" value="' + esc(date) + '" min="' + esc(A.init.today) + '"></label>' +
       '<div class="f"><span>時間</span><div id="bt"></div></div>' +
+      '<label class="check"><input type="checkbox" id="bany"' + (o.any ? " checked" : "") + '>受付時間の外も出す（知り合いなど）</label>' +   // lifeplus-hours-kind-v1
       '<label class="check" id="tellw"><input type="checkbox" id="btell" checked>患者さんのLINEに知らせる</label>' +
-      '<p class="note">手で入れた予約は、初めての方でもすぐ確定になります。休み・×の時間にも入れられます。</p>' +
+      '<p class="note">手で入れた予約は、初めての方でもすぐ確定になります。休み・×の時間にも入れられます。<b class="tk staff">手</b>は手入力だけの時間、<b class="tk other">外</b>は受付時間の外です（どちらもお客さまには見えません）。</p>' +
       '<button class="btn mint wide" id="bgo" disabled>この内容で入れる</button><button class="btn gray wide" id="bno">やめる</button>');
 
     function drawWho() {
@@ -727,24 +754,26 @@
       var mid = $("#bm").value; date = $("#bd").value;
       if (!date) { $("#bt").innerHTML = ""; return; }
       $("#bt").innerHTML = '<div class="spinner" aria-hidden="true" style="margin:8px auto"></div>';
-      api("admin_slots", { date: date, menuId: mid }).then(function (r) {
+      api("admin_slots", { date: date, menuId: mid, any: !!($("#bany") && $("#bany").checked) }).then(function (r) {
         var $t = $("#bt"); if (!$t) return;
-        if (!r.slots.length) { $t.innerHTML = '<p class="note">この日は入れられる時間がありません（受付のない曜日か、埋まっています）。</p>'; return; }
+        if (!r.slots.length) { $t.innerHTML = '<p class="note">この日は入れられる時間がありません（受付のない曜日か、埋まっています）。「受付時間の外も出す」で、ほかの時間も選べます。</p>'; return; }
         $t.innerHTML = '<div class="times">' + r.slots.map(function (s) {
-          return '<button class="time" data-at="' + esc(s.startsAt) + '" data-t="' + esc(s.time) + '">' + esc(s.time) + "</button>";
+          var k = s.kind || "public";
+          return '<button class="time ' + esc(k === "public" ? "" : k) + '" data-at="' + esc(s.startsAt) + '" data-t="' + esc(s.time) + '">' + esc(s.time) +
+            (k === "staff" ? '<b class="tk staff">手</b>' : k === "other" ? '<b class="tk other">外</b>' : "") + "</button>";
         }).join("") + "</div>";
         var pick = function (el) {
           $$(".time", $t).forEach(function (x) { x.classList.toggle("on", x === el); });
           picked = el.getAttribute("data-at"); $("#bgo").disabled = false;
         };
         on(".time", pick, $t);
-        if (want) { var w = $('[data-t="' + want + '"]', $t); if (w) pick(w); else toast(want + " からは、このメニューは入れられません。"); want = null; }
+        if (want) { var w = $('[data-t="' + want + '"]', $t); if (w) { pick(w); w.scrollIntoView({ block: "nearest" }); } else toast(want + " からは、このメニューは入れられません。"); want = null; }
       }, fail);
     }
     // 選んだ時間の枠に合うメニュー（接骨院ならその事業）を先に選んでおく
     if (o.menuId) $("#bm").value = o.menuId;
     drawWho();
-    $("#bm").onchange = loadTimes; $("#bd").onchange = loadTimes;
+    $("#bm").onchange = loadTimes; $("#bd").onchange = loadTimes; $("#bany").onchange = loadTimes;
     $("#bno").onclick = closeSheet;
     $("#bgo").onclick = function () {
       if (!picked) return;
@@ -862,6 +891,70 @@
       if (e.code === "no_token" || e.code === "token_invalid") throw e;
       var x = new Error(e.code); x.code = e.code; x.join = true; throw x;
     });
+  }
+
+
+  // =============================================================
+  // 設定（HIROさんだけ）  marker: lifeplus-settings-v1
+  //   受付時間（曜日ごと・種類つき）と、予約の決まりごと
+  //   種類：お客さまに見せる（予約ページで選べる）／手入力だけ（予約表にうっすら出て、手で入れるときだけ選べる）
+  // =============================================================
+  var WD_ISO = [[1, "月"], [2, "火"], [3, "水"], [4, "木"], [5, "金"], [6, "土"], [7, "日"]];
+  function showSettings() {
+    loadingMain("設定");
+    api("admin_settings").then(function (r) { A.set = JSON.parse(JSON.stringify(r)); renderSettings(); }, fail);
+  }
+  function renderSettings() {
+    var S = A.set, h = "";
+    h += '<div class="card"><h2 style="margin-top:0">受付時間</h2>' +
+      '<p class="note"><b class="kind public">見せる</b> お客さまの予約ページで選べる時間です。<br>' +
+      '<b class="kind staff">手入力だけ</b> お客さまには見えません。予約表にうっすら出て、手で予約を入れるときだけ選べます（知り合いなど）。</p>';
+    WD_ISO.forEach(function (w) {
+      var rows = S.hours.map(function (x, i) { return { x: x, i: i }; }).filter(function (o) { return o.x.weekday === w[0]; })
+        .sort(function (a, b) { return toMin(a.x.open) - toMin(b.x.open); });
+      h += '<div class="wdrow"><div class="wdname' + (w[0] === 7 ? " sun" : w[0] === 6 ? " sat" : "") + '">' + w[1] + '</div><div class="wdlist">' +
+        (rows.length ? rows.map(function (o) {
+          var x = o.x;
+          return '<div class="hrow ' + esc(x.kind) + '">' +
+            '<select data-hk="' + o.i + '" aria-label="種類"><option value="public"' + (x.kind === "public" ? " selected" : "") + '>見せる</option><option value="staff"' + (x.kind === "staff" ? " selected" : "") + ">手入力だけ</option></select>" +
+            '<select data-ho="' + o.i + '" aria-label="何時から">' + timeOptions(5 * 60, 23 * 60 + 45, x.open) + "</select><span>〜</span>" +
+            '<select data-hc="' + o.i + '" aria-label="何時まで">' + timeOptions(5 * 60 + 15, 24 * 60, x.close) + "</select>" +
+            '<button class="link red" data-hdel="' + o.i + '" aria-label="この時間を消す">×</button></div>';
+        }).join("") : '<div class="note" style="margin:6px 0">受付なし</div>') +
+        '<button class="link" data-hadd="' + w[0] + '">＋ 時間を足す</button></div></div>';
+    });
+    h += "</div>";
+    h += '<div class="card"><h2 style="margin-top:0">予約の決まりごと</h2>' +
+      '<label class="f"><span>予約・取消の締め切り（開始の何分前まで）</span><input type="number" id="sl" min="0" max="2880" step="15" value="' + esc(S.leadMinutes) + '"></label>' +
+      '<label class="f"><span>何日先まで予約できるか</span><input type="number" id="sh" min="1" max="365" value="' + esc(S.horizonDays) + '"></label>' +
+      '<label class="f"><span>ドタキャンが何回続いたら、通院中でも仮予約に戻すか</span><input type="number" id="sn" min="1" max="10" value="' + esc(S.noshowLimit) + '"></label>' +
+      '<p class="note">締め切りと何日先までは、お客さまの予約ページに使われます。手で入れる予約には効きません。</p></div>';
+    h += '<button class="btn mint wide" id="sgo">保存する</button><button class="btn gray wide" id="sre">元に戻す（保存しない）</button>';
+    frame('<div class="day"><h1 class="title">設定</h1></div><div class="sub">受付時間と予約の決まりごと（HIROさんだけ）</div>', h);
+    var num = function (el) { return Number(el.value); };
+    on("[data-hadd]", function (el) {
+      var w = Number(el.getAttribute("data-hadd")), same = S.hours.filter(function (x) { return x.weekday === w; });
+      var last = same.reduce(function (m, x) { return Math.max(m, toMin(x.close)); }, 0);
+      var o = last ? Math.min(last, 23 * 60) : 17 * 60, c = Math.min(o + 60, 24 * 60);
+      S.hours.push({ weekday: w, kind: last ? "staff" : "public", open: hm(o), close: hm(c) });
+      renderSettings();
+    });
+    on("[data-hdel]", function (el) { S.hours.splice(Number(el.getAttribute("data-hdel")), 1); renderSettings(); });
+    $$("[data-hk]").forEach(function (el) { el.onchange = function () { S.hours[Number(el.getAttribute("data-hk"))].kind = el.value; renderSettings(); }; });
+    $$("[data-ho]").forEach(function (el) { el.onchange = function () { S.hours[Number(el.getAttribute("data-ho"))].open = el.value; }; });
+    $$("[data-hc]").forEach(function (el) { el.onchange = function () { S.hours[Number(el.getAttribute("data-hc"))].close = el.value; }; });
+    $("#sre").onclick = function () { showSettings(); };
+    $("#sgo").onclick = function () {
+      S.leadMinutes = num($("#sl")); S.horizonDays = num($("#sh")); S.noshowLimit = num($("#sn"));
+      for (var i = 0; i < S.hours.length; i++) {
+        if (toMin(S.hours[i].close) <= toMin(S.hours[i].open)) { toast("「何時まで」は「何時から」より後にしてください。"); return; }
+      }
+      busy($("#sgo"), api("admin_settings_save", { hours: S.hours, leadMinutes: S.leadMinutes, horizonDays: S.horizonDays, noshowLimit: S.noshowLimit }))
+        .then(function (r) {
+          A.set = JSON.parse(JSON.stringify(r));
+          return api("admin_init").then(function (d) { d.me = A.init.me; A.init = d; renderSettings(); toast("保存しました"); });
+        }, fail);
+    };
   }
 
   // ---------- 文字の大きさ（この端末に覚えておく） ----------
