@@ -5,6 +5,24 @@ from playwright.sync_api import sync_playwright, expect
 BASE = "http://127.0.0.1:8765"
 SHOTS = sys.argv[1] if len(sys.argv) > 1 else "."
 CONFIG = "window.LP_CONFIG = { LIFF_ID: 'test', API_URL: '/api' };"
+FD = os.environ.get("FONTS_DIR", "")
+def fonts(ctx):
+    # 見た目を確かめるときは、手元に置いた同じ書体を使う（FONTS_DIR が無ければ書体なし）
+    if not FD:
+        ctx.route("https://fonts.googleapis.com/**", lambda r: r.fulfill(body="", content_type="text/css")); return
+    css = []
+    for fam, pkg, ws in (("Zen Kaku Gothic New", "zen-kaku-gothic-new", (500, 700, 900)), ("Outfit", "outfit", (300, 400, 500)), ("BIZ UDPGothic", "biz-udpgothic", (400, 700))):
+        for w in ws:
+            for sub in (("japanese", "latin") if pkg != "outfit" else ("latin",)):
+                css.append(f"@font-face{{font-family:'{fam}';font-weight:{w};src:url(https://fontfile.local/{pkg}/{pkg}-{sub}-{w}-normal.woff2)}}")
+    ctx.route("https://fonts.googleapis.com/**", lambda r: r.fulfill(body="".join(css), content_type="text/css"))
+    def ff(r):
+        name = r.request.url.split("fontfile.local/")[1]
+        pkg, fn = name.split("/")
+        path = os.path.join(FD, "node_modules/@fontsource", pkg, "files", fn)
+        if os.path.exists(path): r.fulfill(body=open(path, "rb").read(), content_type="font/woff2", headers={"access-control-allow-origin": "*"})
+        else: r.fulfill(status=404, body="")
+    ctx.route("https://fontfile.local/**", ff)
 results = []
 def check(name, cond):
     results.append(("OK" if cond else "NG", name)); print(("OK " if cond else "NG ") + name)
@@ -14,21 +32,21 @@ with sync_playwright() as p:
     for vw, vh, tag in ((390, 844, "sp"), (1280, 860, "pc")):
         ctx = b.new_context(viewport={"width": vw, "height": vh}, device_scale_factor=1, locale="ja-JP")
         ctx.route("**/config.js*", lambda r: r.fulfill(body=CONFIG, content_type="text/javascript"))
-        ctx.route("https://fonts.googleapis.com/**", lambda r: r.fulfill(body="", content_type="text/css"))
+        fonts(ctx)
         ctx.route("https://www.google.com/maps**", lambda r: r.fulfill(body="<html><body style='background:#dde'>地図</body></html>", content_type="text/html"))
         pg = ctx.new_page(); errors = []
         pg.on("pageerror", lambda e: errors.append(str(e)))
         pg.goto(BASE + "/"); pg.wait_for_timeout(1500)
         pg.screenshot(path=f"{SHOTS}/site_top_{tag}.png", full_page=True)
-        check(f"[{tag}] トップ：見出し", pg.inner_text("h1").replace("\n", "") == "ひとつの建物に、3つの入口があります。")
-        check(f"[{tag}] トップ：入口3つが各ページへ", [pg.get_attribute(f".door.d{i}", "href") for i in (1, 2, 3)] == ["dayservice/", "sekkotsu/", "bodycare/"])
+        check(f"[{tag}] トップ：見出し", pg.inner_text("h1").replace("\n", "") == "からだと、くらしに、プラスを。")
+        check(f"[{tag}] トップ：3つの事業が各ページへ", [pg.get_attribute(f".svc:nth-of-type({i})", "href") for i in (1, 2, 3)] == ["dayservice/", "sekkotsu/", "bodycare/"])
         check(f"[{tag}] 横にはみ出さない", pg.evaluate("document.documentElement.scrollWidth <= innerWidth + 1"))
         if tag == "sp":
             check("[sp] メニューは閉じている", not pg.locator(".nav").is_visible())
             pg.click(".menu-btn"); check("[sp] メニューを開ける", pg.locator(".nav").is_visible())
             pg.click(".menu-btn")
-        pg.click(".door.d2"); pg.wait_for_load_state()
-        check(f"[{tag}] 入口を押すと接骨院へ", pg.url.endswith("/sekkotsu/"))
+        pg.click(".svc.c-kotsu"); pg.wait_for_load_state()
+        check(f"[{tag}] 押すと接骨院へ", pg.url.endswith("/sekkotsu/"))
         for path in ("dayservice", "sekkotsu", "bodycare"):
             pg.goto(f"{BASE}/{path}/"); pg.wait_for_timeout(400)
             pg.screenshot(path=f"{SHOTS}/site_{path}_{tag}.png", full_page=True)
@@ -64,7 +82,7 @@ with sync_playwright() as p:
     check("LIFF から開くと予約ページへ", pg.url.endswith("/yoyaku/"))
     ctx.close()
     ctx = b.new_context(user_agent="Mozilla/5.0 (iPhone) Line/14.0.0")
-    ctx.route("https://fonts.googleapis.com/**", lambda r: r.fulfill(body="", content_type="text/css"))
+    fonts(ctx)
     pg = ctx.new_page(); pg.goto(BASE + "/"); pg.wait_for_timeout(500)
     check("LINE のトークで開いたホームページはそのまま", pg.url == BASE + "/")
     b.close()

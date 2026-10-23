@@ -1,4 +1,4 @@
-/* LIFE PLUS ホームページ  marker: lifeplus-site-v1 / site-contact-v1 */
+/* LIFE PLUS ホームページ  marker: lifeplus-site-v1 / lifeplus-site-v2 / site-contact-v1 */
 (function () {
   "use strict";
 
@@ -20,6 +20,13 @@
       try { localStorage.setItem("lp_text_zoom", String(v)); } catch (_) { /* 何もしない */ }
     });
   });
+
+  // ---------- 少し下へ動かしたら、上の帯に線を引く ----------
+  var top = document.querySelector(".site-top");
+  if (top) {
+    var onScroll = function () { top.classList.toggle("scrolled", window.scrollY > 8); };
+    window.addEventListener("scroll", onScroll, { passive: true }); onScroll();
+  }
 
   // ---------- スマホのメニュー ----------
   var mb = document.querySelector(".menu-btn"), nav = document.querySelector(".nav");

@@ -47,3 +47,9 @@ deno run -A tests/e2e_server.ts & python3 tests/e2e_test.py      # 画面 11項�
   - いたずら・営業よけ：URL を書いたものは断る／見えない欄が埋まっている・開いて3秒以内は捨てる／同じ所から1時間に3件・全体で1日50件まで
   - 表：`sql/lifeplus_contact_v1.sql`
 - 確かめ：`tests/contact_test.ts`（関所 7項目）・`tests/e2e_site_test.py`（画面 38項目・スマホとパソコン）
+
+## 2026-10-23 ホームページの作り直し（marker: lifeplus-site-v2）
+- 色は会社のロゴ（オレンジ #f39800 × グリーン #6eb92c）から。デイ＝オレンジ／接骨院＝グリーン／ボディケア＝藤墨（#5a4b78）
+- 書体：見出し Zen Kaku Gothic New・本文 BIZ UDPゴシック・英字 Outfit
+- ロゴ：`docs/img/`（logo.png・wordmark.png・wordmark-w.png・mark.svg＝ロゴの＋を描き直したもの・icon-*.png）
+- 見た目の確かめ：`FONTS_DIR=…（@fontsource の zen-kaku-gothic-new / outfit / biz-udpgothic を入れた所） python3 tests/e2e_site_test.py <写真の置き場>`

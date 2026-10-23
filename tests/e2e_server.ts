@@ -28,8 +28,9 @@ Deno.serve({ port: 8765 }, async (req) => {
   const path = u.pathname.endsWith("/") ? u.pathname.slice(1) + "index.html" : u.pathname.slice(1);
   try {
     const body = await Deno.readFile(new URL(path, root));
-    const type = path.endsWith(".js") ? "text/javascript" : path.endsWith(".css") ? "text/css" : "text/html";
-    return new Response(body, { headers: { "content-type": type + "; charset=utf-8" } });
+    const type = path.endsWith(".js") ? "text/javascript; charset=utf-8" : path.endsWith(".css") ? "text/css; charset=utf-8"
+      : path.endsWith(".svg") ? "image/svg+xml" : path.endsWith(".png") ? "image/png" : "text/html; charset=utf-8";
+    return new Response(body, { headers: { "content-type": type } });
   } catch {
     return new Response("not found", { status: 404 });
   }
