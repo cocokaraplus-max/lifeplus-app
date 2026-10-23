@@ -60,6 +60,9 @@
     pair_invalid: "番号が違うか、期限（15分）が切れています。HIROさんに新しい番号をもらってください。",
     pair_too_many: "番号の入れ間違いが続いたため、しばらく登録できません。1時間ほどおいてください。",
     device_not_found: "この端末は見つかりませんでした。",
+    // customer-delete-staff-v1
+    customer_has_line: "LINEでつながっているお客さまは、HIROさんの画面から消してください。",
+    customer_has_booking: "これからの予約が入っています。先に予約を取り消してから消してください。",
   };
   var WD = ["日", "月", "火", "水", "木", "金", "土"];
   var STATUS = { pending: "確認待ち", confirmed: "確定", done: "来院済み", no_show: "無断キャンセル", late_cancel: "直前キャンセル", cancelled: "取消", rejected: "お断り" };
@@ -704,7 +707,8 @@
           (hst.bookings.length ? hst.bookings.map(function (b) {
             return '<button class="h" data-bk="' + esc(b.id) + '" style="width:100%;background:none;border:0;border-bottom:1px solid var(--line);text-align:left"><span>' + mds(b.date) + "（" + WD[wdOf(b.date)] + "）" + esc(b.time) + "　" + esc(b.menuName) + "</span><b>" + esc(STATUS[b.status] || b.status) + "</b></button>";
           }).join("") : '<p class="note">まだ予約はありません。</p>') + "</div>" +
-          (owner() ? '<div class="danger-zone" style="text-align:center;margin-top:16px"><button class="link red" id="tdel">この方を消す（テストで入れた人など）</button></div>' : ""));
+          // customer-delete-staff-v1: HIROさんは誰でも。お客さまの権限がある端末・スタッフは、手で入れた人（LINEなし）だけ
+          (owner() || (can("customers") && !c.hasLine) ? '<div class="danger-zone" style="text-align:center;margin-top:16px"><button class="link red" id="tdel">この方を消す（テストや間違いで入れた人など）</button></div>' : ""));
         $("#ts").onclick = function () {
           busy($("#ts"), api("admin_customer_update", { customerId: c.id, isReturning: $("#tr").checked, isBlocked: $("#tb").checked, memo: $("#tm").value })).then(function () {
             c.isReturning = $("#tr").checked; c.isBlocked = $("#tb").checked; c.memo = $("#tm").value;

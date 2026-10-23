@@ -133,6 +133,7 @@ const PERM_OF: Record<string, string | null> = {
   admin_closures: "closures", admin_closure_add: "closures", admin_closure_del: "closures",
   admin_decide: "bookings", admin_outcome: "bookings", admin_cancel: "bookings", admin_slots: "bookings", admin_book: "bookings",
   admin_customers: "customers", admin_customer: "customers", admin_customer_update: "customers", admin_message: "customers",
+  admin_customer_delete: "customers",   // customer-delete-staff-v1: HIROさん以外は、LINEなし・これからの予約なしの人だけ（下の runAdmin で見る）
 };
 interface Me { owner: boolean; perms: string[]; label: string; staffId: string | null; deviceId?: string | null }
 async function staffOf(sql: Sql, sub: string): Promise<Me | null> {
@@ -361,6 +362,19 @@ async function runAdmin(me: Me, body: any, deps: Deps, now: Date): Promise<Recor
   }
   const need = body.action in PERM_OF ? PERM_OF[body.action] : "owner";
   if (need === "owner" ? !me.owner : need !== null && !me.perms.includes(need)) throw new ApiError("no_permission", 403);
+  // customer-delete-staff-v1: お店の端末・スタッフが消せるのは、手で入れた人（LINEなし）で、これからの予約が無い人だけ
+  //   ★LINE でつながっている人は、消してもまた予約ページを開けば作り直される。HIROさんだけにしておく
+  //   ★これからの予約が入っている人を消すと、患者さんに知らせずに予約が消える。先に取り消してもらう
+  if (body.action === "admin_customer_delete" && !me.owner) {
+    const id = str(body.customerId, 40);
+    if (!UUID_RE.test(id)) throw new ApiError("customer_not_found");
+    const c = await deps.sql`select line_user_id from customers where id = ${id}::uuid`;
+    if (!c.length) throw new ApiError("customer_not_found", 404);
+    if (c[0].line_user_id) throw new ApiError("customer_has_line", 403);
+    const live = await deps.sql`select 1 from bookings where customer_id = ${id}::uuid and status in ('pending', 'confirmed')
+      and starts_at > ${now.toISOString()}::timestamptz limit 1`;
+    if (live.length) throw new ApiError("customer_has_booking", 409);
+  }
   const out = await handleAdmin(body, deps, now);
   if (body.action === "admin_init") out.me = { owner: me.owner, perms: me.perms, label: me.label, device: !!me.deviceId };
   return out;

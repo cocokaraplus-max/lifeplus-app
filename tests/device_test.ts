@@ -66,6 +66,13 @@ Deno.test({ name: "お店の端末", sanitizeOps: false, sanitizeResources: fals
       await hiro({ action: "admin_device_update", id, label: "受付PC", perms: ["customers"] });
       eq(await code(dev(tok, { action: "admin_customers" })), "ok");
     });
+    await t.step("お客さまの権限がある端末は、手で入れた人（LINEなし・予約なし）を消せる", async () => {
+      const cu = (await sql`insert into customers (name, phone) values ('端末で消す人', '09033334444') returning id`)[0].id;
+      eq(await dev(tok, { action: "admin_customer_delete", customerId: cu }), { ok: true, bookings: 0 });
+      const lc = (await sql`insert into customers (name, line_user_id) values ('LINEの人', 'Uline-del') returning id`)[0].id;
+      eq(await code(dev(tok, { action: "admin_customer_delete", customerId: lc })), "customer_has_line");
+      await sql`delete from customers where id = ${lc}`;
+    });
     await t.step("番号を出し直すと、それまでの端末は使えなくなる", async () => {
       const r = await hiro({ action: "admin_device_code", id });
       eq(await code(dev(tok, { action: "admin_init" })), "device_invalid");

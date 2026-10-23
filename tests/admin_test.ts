@@ -187,7 +187,14 @@ Deno.test({ name: "管理画面", sanitizeOps: false, sanitizeResources: false, 
     const inv = await call("hiro", { action: "admin_staff_invite", label: "全部さん", perms: ["closures", "bookings", "customers", "notify"] });
     await call("all", { action: "staff_join", code: inv.code });
     eq(await code(call("all", { action: "admin_booking_delete", bookingId: r.id })), "no_permission");
-    eq(await code(call("all", { action: "admin_customer_delete", customerId: c.id })), "no_permission");
+    // customer-delete-staff-v1: お客さまの権限があるスタッフは、LINEなし・これからの予約なしの人だけ消せる
+    const r2 = await call("hiro", { action: "admin_book", customerId: c.id, menuId: mid("施術（保険）"), startsAt: "2026-11-05T17:30:00+09:00" });
+    eq(await code(call("all", { action: "admin_customer_delete", customerId: c.id })), "customer_has_booking");
+    await call("hiro", { action: "admin_cancel", bookingId: r2.id });
+    await call("hiro", { action: "admin_booking_delete", bookingId: r2.id });
+    // deno-lint-ignore no-explicit-any
+    const lineCust = ((await call("hiro", { action: "admin_customers", q: "" })).customers as any[]).find((x) => x.hasLine);
+    if (lineCust) eq(await code(call("all", { action: "admin_customer_delete", customerId: lineCust.id })), "customer_has_line");
     await sql`delete from staff_members`;
     // 1件だけ消す
     await call("hiro", { action: "admin_booking_delete", bookingId: r.id });

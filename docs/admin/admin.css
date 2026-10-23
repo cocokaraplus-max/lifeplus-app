@@ -249,3 +249,10 @@ main { padding-bottom: 90px; }
 .devh { font-size: 17px; margin: 26px 0 8px; }
 .bar-top .gear { border: 1.5px solid rgba(255,255,255,.55); background: transparent; color: #fff; border-radius: 999px; width: 32px; height: 30px; font-size: 16px; line-height: 1; padding: 0; margin-left: 6px; flex: none; }   /* admin-device-v3 */
 .bar-top .sizes { margin-left: auto; }   /* admin-device-v3: ⚙ と並べても右に寄せる */
+
+/* ---------- iPad・パソコン：上の帯・下のタブ・＋ボタンを、予約表と同じ幅の列にそろえる  marker: admin-wide-align-v1 ---------- */
+:root { --col: 640px; }
+@media (min-width: 900px) { :root { --col: 760px; } main, .sheet { max-width: var(--col); } }
+.bar { padding-left: max(16px, calc((100% - var(--col)) / 2 + 14px)); padding-right: max(16px, calc((100% - var(--col)) / 2 + 14px)); }
+.tabs { padding-left: max(0px, calc((100% - var(--col)) / 2)); padding-right: max(0px, calc((100% - var(--col)) / 2)); }
+.fab { right: max(18px, calc((100vw - var(--col)) / 2 + 18px)); }
