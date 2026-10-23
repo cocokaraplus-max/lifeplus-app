@@ -858,7 +858,7 @@
       var box = $("#devs"); if (!box || A.tab !== "staff") return;
       box.innerHTML = '<div class="card" style="padding:4px 12px">' + (r.devices.length ? r.devices.map(function (d) {
         var st = d.paired ? '<span class="pill reg">使えます</span>' : d.pairing ? '<span class="pill new">番号を出しています</span>' : '<span class="pill ns">まだ登録していません</span>';
-        var sub = permText(d.perms) + (d.paired ? "　" + (uaText(d.ua) ? uaText(d.ua) + "・" : "") + (d.lastSeen ? "最後に開いた日：" + mds(d.lastSeen) : "") : "");
+        var sub = permText(d.perms) + (d.paired ? "　" + (uaText(d.ua) ? uaText(d.ua) + "・" : "") + (d.lastSeen ? "最後に開いたのは " + untilText(d.lastSeen) : "") : "");
         return '<button class="cust" data-d="' + esc(d.id) + '"><span class="av">端</span>' +
           '<span class="g"><span class="nm">' + esc(d.label) + "</span><br>" +
           '<span class="sb">' + esc(sub) + "</span></span>" + st + "</button>";
@@ -873,7 +873,7 @@
   function deviceForm(d) {
     var ps = d ? d.perms : ["bookings"];
     openSheet("<h3>" + (d ? esc(d.label) : "お店の端末を登録する") + "</h3>" +
-      (d && d.paired ? '<p class="note">' + esc(uaText(d.ua) || "端末") + (d.pairedAt ? "　登録した日：" + mds(d.pairedAt) : "") + (d.lastSeen ? "　最後に開いた日：" + mds(d.lastSeen) : "") + "</p>" : "") +
+      (d && d.paired ? '<p class="note">' + esc(uaText(d.ua) || "端末") + (d.pairedAt ? "　登録 " + untilText(d.pairedAt) : "") + (d.lastSeen ? "　最後に開いたのは " + untilText(d.lastSeen) : "") + "</p>" : "") +
       '<label class="f"><span>呼び名（例：受付PC、施術室のiPad）</span><input id="dl" maxlength="30" value="' + esc(d ? d.label : "") + '"></label>' +
       '<div class="f"><span>できること</span>' +
       '<label class="check" style="color:var(--mute)"><input type="checkbox" checked disabled>予約表を見る（全員）</label>' +
@@ -951,7 +951,7 @@
   function staffForm(s) {
     var ps = s ? s.perms : ["closures"];
     openSheet("<h3>" + (s ? esc(s.label) : "人を追加する") + "</h3>" +
-      (s && s.joined ? '<p class="note">LINE名：' + esc(s.lineName || "—") + (s.lastSeen ? "　最後に開いた日：" + mds(s.lastSeen) : "") + "</p>" : "") +
+      (s && s.joined ? '<p class="note">LINE名：' + esc(s.lineName || "—") + (s.lastSeen ? "　最後に開いたのは " + untilText(s.lastSeen) : "") + "</p>" : "") +
       '<label class="f"><span>呼び名（自分用。例：受付さん、朋子）</span><input id="sl" maxlength="30" value="' + esc(s ? s.label : "") + '"></label>' +
       '<div class="f"><span>できること</span>' +
       '<label class="check" style="color:var(--mute)"><input type="checkbox" checked disabled>予約表を見る（全員）</label>' +
