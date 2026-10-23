@@ -1,6 +1,6 @@
 // =============================================================
 // LIFE PLUS 予約  関所（Supabase Edge Function: booking）
-// marker: lifeplus-booking-fn-v1 / admin-notify-v1 / notify-contact-v1 / admin-api-v1 / staff-perms-v1 / site-contact-v1
+// marker: lifeplus-booking-fn-v1 / admin-notify-v1 / notify-contact-v1 / admin-api-v1 / staff-perms-v1 / site-contact-v1 / admin-device-v1
 //
 // 予約ページ（LIFF）からの依頼は、すべてここを通る。
 //   1. LINE の ID トークンを LINE 本体に問い合わせて、本人を確かめる
@@ -134,7 +134,7 @@ const PERM_OF: Record<string, string | null> = {
   admin_decide: "bookings", admin_outcome: "bookings", admin_cancel: "bookings", admin_slots: "bookings", admin_book: "bookings",
   admin_customers: "customers", admin_customer: "customers", admin_customer_update: "customers", admin_message: "customers",
 };
-interface Me { owner: boolean; perms: string[]; label: string; staffId: string | null }
+interface Me { owner: boolean; perms: string[]; label: string; staffId: string | null; deviceId?: string | null }
 async function staffOf(sql: Sql, sub: string): Promise<Me | null> {
   if ((await adminIds(sql)).includes(sub)) return { owner: true, perms: [...PERMS], label: "HIRO", staffId: null };
   const r = await sql`update staff_members set last_seen_at = now() where line_user_id = ${sub} returning id, label, perms`;
@@ -252,6 +252,66 @@ async function ipHash(ip: string): Promise<string | null> {
   const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("lp-contact:" + ip));
   return Array.from(new Uint8Array(d)).slice(0, 12).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
+// ---------- お店の端末（LINE を使わずに管理画面を開く）  marker: admin-device-v1 ----------
+//  HIROさんが管理画面で6桁の番号を出す → お店の端末でその番号を入れる → 端末に長い合鍵（deviceToken）を渡す。
+//  ★番号も合鍵も、表にはハッシュだけ残す ★通知は受け取れない（LINE が無いので）
+//  ★180日開かなかった端末は使えなくなる ★番号を出し直すと、それまでの端末は使えなくなる
+const DEVICE_PERMS = ["closures", "bookings", "customers"];
+const PAIR_MINUTES = 15;
+const DEVICE_IDLE_DAYS = 180;
+const PAIR_FAILS_PER_IP_HOUR = 10;
+const PAIR_FAILS_ALL_HOUR = 50;
+async function sha256hex(s: string): Promise<string> {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+function newPairCode(): string {
+  const b = new Uint32Array(1);
+  // 偏りが出ないように、100万の倍数より上は引き直す
+  do crypto.getRandomValues(b); while (b[0] >= 4294000000);
+  return String(b[0] % 1000000).padStart(6, "0");
+}
+function newDeviceToken(): string {
+  const b = new Uint8Array(32);
+  crypto.getRandomValues(b);
+  return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function cleanDevicePerms(v: unknown): string[] {
+  return Array.isArray(v) ? DEVICE_PERMS.filter((p) => v.includes(p)) : [];
+}
+async function deviceOf(sql: Sql, token: string, now: Date): Promise<Me | null> {
+  const h = await sha256hex("lp-device:" + token);
+  const idle = new Date(now.getTime() - DEVICE_IDLE_DAYS * 86400000).toISOString();
+  const r = await sql`update admin_devices set last_seen_at = ${now.toISOString()}::timestamptz
+    where token_hash = ${h} and coalesce(last_seen_at, paired_at) > ${idle}::timestamptz returning id, label, perms`;
+  if (!r.length) return null;
+  return { owner: false, perms: cleanDevicePerms(r[0].perms), label: r[0].label, staffId: null, deviceId: r[0].id };
+}
+// deno-lint-ignore no-explicit-any
+async function handleDevicePair(body: any, deps: Deps, now: Date): Promise<Record<string, unknown>> {
+  const { sql } = deps;
+  const ih = await ipHash("pair:" + (deps.clientIp ?? ""));
+  const hourAgo = new Date(now.getTime() - 3600000).toISOString();
+  const f = await sql`select count(*) filter (where ip_hash = ${ih})::int as mine, count(*)::int as all
+    from device_pair_fails where created_at > ${hourAgo}::timestamptz`;
+  if (f[0].mine >= PAIR_FAILS_PER_IP_HOUR || f[0].all >= PAIR_FAILS_ALL_HOUR) throw new ApiError("pair_too_many", 429);
+  const code = String(body.code ?? "").replace(/[^0-9]/g, "");
+  const row = code.length === 6
+    ? await sql`select id, label from admin_devices where pair_code_hash = ${await sha256hex("lp-pair:" + code)}
+        and pair_expires_at > ${now.toISOString()}::timestamptz`
+    : [];
+  if (!row.length) {
+    await sql`insert into device_pair_fails (ip_hash, created_at) values (${ih}, ${now.toISOString()}::timestamptz)`;
+    throw new ApiError("pair_invalid", 404);
+  }
+  const token = newDeviceToken();
+  await sql`update admin_devices set token_hash = ${await sha256hex("lp-device:" + token)}, pair_code_hash = null, pair_expires_at = null,
+    paired_at = ${now.toISOString()}::timestamptz, last_seen_at = ${now.toISOString()}::timestamptz, user_agent = ${str(body.ua, 200) || null}
+    where id = ${row[0].id}`;
+  await tellOwner(deps, `【管理画面】お店の端末「${row[0].label}」を登録しました。心当たりが無いときは、管理画面のスタッフ→お店の端末から外してください。`);
+  return { ok: true, deviceToken: token, label: row[0].label };
+}
+
 // deno-lint-ignore no-explicit-any
 async function handleContact(body: any, deps: Deps, now: Date): Promise<Record<string, unknown>> {
   const { sql } = deps;
@@ -291,6 +351,21 @@ async function handleContact(body: any, deps: Deps, now: Date): Promise<Record<s
   return { ok: true };
 }
 
+// 管理画面の操作（LINE の人も、お店の端末も、ここを通る）
+// deno-lint-ignore no-explicit-any
+async function runAdmin(me: Me, body: any, deps: Deps, now: Date): Promise<Record<string, unknown>> {
+  // お店の端末が自分の登録を外す（端末の「登録を外す」ボタン）
+  if (body.action === "admin_device_forget") {
+    if (me.deviceId) await deps.sql`update admin_devices set token_hash = null where id = ${me.deviceId}::uuid`;
+    return { ok: true };
+  }
+  const need = body.action in PERM_OF ? PERM_OF[body.action] : "owner";
+  if (need === "owner" ? !me.owner : need !== null && !me.perms.includes(need)) throw new ApiError("no_permission", 403);
+  const out = await handleAdmin(body, deps, now);
+  if (body.action === "admin_init") out.me = { owner: me.owner, perms: me.perms, label: me.label, device: !!me.deviceId };
+  return out;
+}
+
 // ---------- 本体 ----------
 // deno-lint-ignore no-explicit-any
 export async function handle(body: any, deps: Deps): Promise<Record<string, unknown>> {
@@ -300,6 +375,16 @@ export async function handle(body: any, deps: Deps): Promise<Record<string, unkn
 
   // site-contact-v1: ホームページのお問い合わせ（LINE のログインは要らない）
   if (body.action === "contact") return await handleContact(body, deps, now);
+
+  // admin-device-v1: お店の端末（LINE のログインは要らない）
+  if (body.action === "device_pair") return await handleDevicePair(body, deps, now);
+  const dtok = str(body.deviceToken, 200);
+  if (dtok) {
+    if (typeof body.action !== "string" || !body.action.startsWith("admin_")) throw new ApiError("no_permission", 403);
+    const me = await deviceOf(sql, dtok, now);
+    if (!me) throw new ApiError("device_invalid", 401);
+    return await runAdmin(me, body, deps, now);
+  }
 
   const token = str(body.idToken, 4000);
   if (!token) throw new ApiError("no_token", 401);
@@ -330,11 +415,7 @@ export async function handle(body: any, deps: Deps): Promise<Record<string, unkn
   if (typeof body.action === "string" && body.action.startsWith("admin_")) {
     const me = await staffOf(sql, who.sub);
     if (!me) throw new ApiError("not_admin", 403);
-    const need = body.action in PERM_OF ? PERM_OF[body.action] : "owner";
-    if (need === "owner" ? !me.owner : need !== null && !me.perms.includes(need)) throw new ApiError("no_permission", 403);
-    const out = await handleAdmin(body, deps, now);
-    if (body.action === "admin_init") out.me = { owner: me.owner, perms: me.perms, label: me.label };
-    return out;
+    return await runAdmin(me, body, deps, now);
   }
 
   const cust = await getOrCreateCustomer(sql, who);
@@ -983,6 +1064,63 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
       const id = str(body.id, 40);
       if (!UUID_RE.test(id)) throw new ApiError("bad_request");
       await sql`delete from staff_members where id = ${id}::uuid`;
+      return { ok: true };
+    }
+
+    // ---------- お店の端末（HIROさんだけ）  marker: admin-device-v1 ----------
+    case "admin_devices": {
+      const rows = await sql`select * from admin_devices order by created_at`;
+      return {
+        devices: rows.map((d: Record<string, unknown>) => ({
+          id: d.id, label: d.label, perms: cleanDevicePerms(d.perms),
+          paired: !!d.token_hash,
+          pairing: !!d.pair_expires_at && (d.pair_expires_at as Date).getTime() > now.getTime(),
+          pairExpires: d.pair_expires_at ? (d.pair_expires_at as Date).toISOString() : null,
+          pairedAt: d.paired_at ? (d.paired_at as Date).toISOString() : null,
+          lastSeen: d.last_seen_at && d.token_hash ? (d.last_seen_at as Date).toISOString() : null,
+          ua: d.token_hash ? d.user_agent ?? "" : "",
+        })),
+      };
+    }
+    case "admin_device_code": {
+      // 新しい端末なら作る。すでにある端末なら番号を出し直す（それまでの端末は使えなくなる）
+      const id = str(body.id, 40);
+      const exp = new Date(now.getTime() + PAIR_MINUTES * 60000).toISOString();
+      for (let i = 0; i < 5; i++) {
+        const code = newPairCode();
+        const ch = await sha256hex("lp-pair:" + code);
+        try {
+          if (id) {
+            if (!UUID_RE.test(id)) throw new ApiError("bad_request");
+            const r = await sql`update admin_devices set pair_code_hash = ${ch}, pair_expires_at = ${exp}::timestamptz, token_hash = null
+              where id = ${id}::uuid returning id`;
+            if (!r.length) throw new ApiError("device_not_found", 404);
+            return { ok: true, id, code, expires: exp };
+          }
+          const label = str(body.label, 30);
+          if (!label) throw new ApiError("label_required");
+          const r = await sql`insert into admin_devices (label, perms, pair_code_hash, pair_expires_at)
+            values (${label}, ${cleanDevicePerms(body.perms)}::text[], ${ch}, ${exp}::timestamptz) returning id`;
+          return { ok: true, id: r[0].id, code, expires: exp };
+        } catch (e) {
+          // 番号がたまたま重なったときだけ引き直す
+          if (e instanceof ApiError || !String((e as Error).message).includes("pair_code_hash")) throw e;
+        }
+      }
+      throw new ApiError("server_error", 500);
+    }
+    case "admin_device_update": {
+      const id = str(body.id, 40), label = str(body.label, 30);
+      if (!UUID_RE.test(id)) throw new ApiError("bad_request");
+      if (!label) throw new ApiError("label_required");
+      const r = await sql`update admin_devices set label = ${label}, perms = ${cleanDevicePerms(body.perms)}::text[] where id = ${id}::uuid returning id`;
+      if (!r.length) throw new ApiError("device_not_found", 404);
+      return { ok: true };
+    }
+    case "admin_device_del": {
+      const id = str(body.id, 40);
+      if (!UUID_RE.test(id)) throw new ApiError("bad_request");
+      await sql`delete from admin_devices where id = ${id}::uuid`;
       return { ok: true };
     }
 

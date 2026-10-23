@@ -64,3 +64,12 @@ deno run -A tests/e2e_server.ts & python3 tests/e2e_test.py      # 画面 11項�
 ## 2026-10-23 社訓とデイの時間（marker: lifeplus-site-v4）
 - トップ：社訓「和顔愛語」を独立した帯で載せる（デイのページからは移した）
 - デイ：ご利用時間を「平日2単位制 9:00〜12:00・13:30〜16:30／日曜1日型 9:30〜16:30」に
+
+## 2026-10-23 お店の端末（LINE を使わずに予約管理を開く）（marker: admin-device-v1）
+- HIROさんの管理画面：スタッフ → お店の端末 → 「番号を出す」。6桁の番号（15分・1回だけ）が出る
+- お店のPC・タブレットのブラウザで `https://cocokaraplus-max.github.io/lifeplus-app/admin/` を開き、番号を入れると登録。次からは開くだけ
+- 端末にできること：休み・予約・お客さまから選ぶ（予約表を見るのは全員）。設定・スタッフはHIROさんだけ。LINE の通知は受け取れない
+- 外す：HIROさんの一覧から／端末の「登録を外す」。番号を出し直すと、それまでの端末は使えなくなる。180日開かなかった端末も使えなくなる
+- 番号の入れ間違いは同じ所から1時間に10回・全体で50回まで
+- 表：`sql/lifeplus_devices_v1.sql`（admin_devices・device_pair_fails。番号も合鍵もハッシュだけ）
+- 確かめ：`tests/device_test.ts`（関所 12項目）・`tests/e2e_device_test.py`（画面 11項目）

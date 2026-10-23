@@ -43,6 +43,8 @@ with sync_playwright() as p:
         c.route("https://static.line-scdn.net/**", lambda r: r.fulfill(body=FAKE_LIFF, content_type="text/javascript"))
         c.route("**/config.js*", lambda r: r.fulfill(body=CONFIG, content_type="text/javascript"))
         c.route("https://fonts.googleapis.com/**", lambda r: r.fulfill(body="", content_type="text/css"))
+        # 関所の「今」（2026-10-16 12:00）にブラウザの時計もそろえる（そろえないと、日が過ぎると予約が「過去」になる）
+        c.clock.set_fixed_time("2026-10-16T12:00:00+09:00")
         return c
     ctx = new_ctx()
     pg = ctx.new_page()

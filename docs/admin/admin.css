@@ -232,3 +232,19 @@ main { padding-bottom: 90px; }
 .hrow.staff { background: #f3effc; border: 1.5px dashed #b9a6ea; }
 .hrow select { width: 100%; border: 2px solid var(--line); border-radius: 8px; padding: 7px 4px; font-size: 15px; background: #fff; min-width: 0; }
 .hrow .link.red { font-size: 20px; padding: 0; }
+
+/* ---------- お店の端末（LINE を使わずに開く）  marker: admin-device-v1 ---------- */
+.pair { max-width: 440px; margin: 0 auto; padding: 40px 16px; }
+.pair h1 { font-size: 18px; font-weight: 400; color: var(--mute); text-align: center; margin: 0 0 20px; }
+.pair h1 b { color: var(--blue); font-weight: 700; }
+.pair h2 { font-size: 20px; margin: 0 0 4px; }
+.pair .f input { font-size: 28px; letter-spacing: .3em; text-align: center; font-variant-numeric: tabular-nums; }
+.pair .link { display: block; margin: 18px auto 0; }
+.pair-msg { background: var(--amber-soft); color: var(--amber); border-radius: 12px; padding: 12px 14px; font-weight: 700; font-size: 14px; }
+.pair-code { text-align: center; font-size: 46px; font-weight: 700; letter-spacing: .14em; margin: 10px 0 0; color: var(--blue-ink); font-variant-numeric: tabular-nums; }
+.pair-code span { display: inline-block; width: .4em; }
+.pair-steps { font-size: 14px; padding-left: 1.4em; margin: 14px 0; }
+.pair-steps li { margin: 6px 0; }
+.mono { font-family: ui-monospace, Menlo, monospace; font-weight: 400; font-size: 12.5px; word-break: break-all; }
+.devh { font-size: 17px; margin: 26px 0 8px; }
+.bar-top .devout { color: #fff; font-size: 12px; padding: 0; margin-left: auto; }

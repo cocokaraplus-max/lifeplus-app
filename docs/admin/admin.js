@@ -1,4 +1,4 @@
-/* LIFE PLUS 予約管理（HIROさんと、招待した人）  marker: lifeplus-admin-ui-v1 / staff-ui-v1
+/* LIFE PLUS 予約管理（HIROさんと、招待した人）  marker: lifeplus-admin-ui-v1 / staff-ui-v1 / admin-device-v1
    タブ：今日（15分刻みの予約表・×で止める）／確認待ち／休み／お客さま
    操作はすべて関所（API_URL の admin_*）を通す。HIROさん以外の LINE では関所が断る。 */
 (function () {
@@ -17,7 +17,12 @@
     offMonth: null,    // 休みカレンダーの月（YYYY-MM）
     closures: [],      // これからの休み
     q: "", filter: "", // お客さまの検索
+    dev: "",           // お店の端末の合鍵（LINE を使わずに開くとき）  admin-device-v1
   };
+  var DEV_KEY = "lp_admin_device";
+  function readDev() { try { return localStorage.getItem(DEV_KEY) || ""; } catch (_) { return ""; } }
+  function saveDev(t) { try { localStorage.setItem(DEV_KEY, t); } catch (_) { /* 覚えられない端末では、開いている間だけ使える */ } }
+  function clearDev() { A.dev = ""; try { localStorage.removeItem(DEV_KEY); } catch (_) { /* 何もしない */ } }
   var ROW = 46;        // 15分の高さ（admin.css の --row と同じ）
 
   var ERR = {
@@ -50,6 +55,11 @@
     hours_invalid: "時間の入れ方がおかしいところがあります（15分きざみ・終わりは始まりより後）。",
     hours_overlap: "同じ曜日で重なっている時間があります。重ならないようにしてください。",
     settings_invalid: "決まりごとの数字がおかしいところがあります。",
+    // admin-device-v1
+    device_invalid: "この端末の登録が外れています。HIROさんに新しい番号をもらって、登録し直してください。",
+    pair_invalid: "番号が違うか、期限（15分）が切れています。HIROさんに新しい番号をもらってください。",
+    pair_too_many: "番号の入れ間違いが続いたため、しばらく登録できません。1時間ほどおいてください。",
+    device_not_found: "この端末は見つかりませんでした。",
   };
   var WD = ["日", "月", "火", "水", "木", "金", "土"];
   var STATUS = { pending: "確認待ち", confirmed: "確定", done: "来院済み", no_show: "無断キャンセル", late_cancel: "直前キャンセル", cancelled: "取消", rejected: "お断り" };
@@ -113,7 +123,7 @@
 
   // ---------- 関所 ----------
   function api(action, payload) {
-    var body = Object.assign({ action: action, idToken: liff.getIDToken() }, payload || {});
+    var body = Object.assign({ action: action }, A.dev ? { deviceToken: A.dev } : { idToken: liff.getIDToken() }, payload || {});
     return fetch(CFG.API_URL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
       .then(function (r) {
         return r.json().catch(function () { return { error: "server_error" }; }).then(function (j) {
@@ -125,10 +135,12 @@
   function fail(e) {
     var code = (e && e.code) || "server_error";
     if (code === "no_token" || code === "token_invalid") { relogin(); return code; }
+    if (code === "device_invalid") { clearDev(); showPair(ERR.device_invalid); return code; }
     toast(ERR[code] || ERR.server_error);
     return code;
   }
   function relogin() {
+    if (A.dev) { clearDev(); showPair(ERR.device_invalid); return; }
     if (liff.isInClient()) { location.reload(); return; }
     try { liff.logout(); } catch (_) { /* 何もしない */ }
     liff.login({ redirectUri: location.href });
@@ -173,11 +185,17 @@
         ICONS[t[0]] + t[1] + (t[0] === "pending" && pc ? '<span class="badge">' + pc + "</span>" : "") + "</button>";
     }).join("");
     $app.innerHTML =
-      '<header class="bar"><div class="bar-top"><span><b>LIFE PLUS</b>　予約管理' + (owner() ? "" : "（" + esc(A.init.me.label) + "）") + "</span>" + sizes() + "</div>" + barInner + "</header>" +
+      '<header class="bar"><div class="bar-top"><span><b>LIFE PLUS</b>　予約管理' + (owner() ? "" : "（" + esc(A.init.me.label) + "）") + "</span>" +
+      (A.dev ? '<button class="link devout" id="devout">登録を外す</button>' : "") + sizes() + "</div>" + barInner + "</header>" +
       "<main>" + mainHtml + "</main>" + (extra || "") +
       '<nav class="tabs" aria-label="切り替え">' + tabs + "</nav>";
     on("[data-tab]", function (b) { go(b.getAttribute("data-tab")); });
     on("[data-size]", function (b) { setZoom(Number(b.getAttribute("data-size"))); });
+    if ($("#devout")) $("#devout").onclick = function () {
+      confirmSheet("この端末の登録を外しますか？", "外すと、この端末では管理画面を開けなくなります。また使うときは、HIROさんに新しい番号をもらいます。", "外す", function () {
+        return api("admin_device_forget").then(function () { clearDev(); closeSheet(); showPair("登録を外しました。"); });
+      });
+    };
   }
   function go(tab) {
     A.tab = tab; window.scrollTo(0, 0);
@@ -816,11 +834,119 @@
       }).join("") : '<div class="empty">まだ誰もいません。</div>') + "</div>" +
         '<button class="btn mint wide" id="sadd">＋ 人を追加する（招待リンクを作る）</button>' +
         '<p class="note">招待リンクをLINEで送り、相手がLINEで開くと参加になります。リンクは1回だけ・' + "3日間使えます。" +
-        "予約表を見るのは全員できます。それ以外は人ごとに選べます。</p>";
-      frame('<div class="day"><h1 class="title">スタッフ</h1></div><div class="sub">管理画面を使える人</div>', h);
+        "予約表を見るのは全員できます。それ以外は人ごとに選べます。</p>" +
+        '<h2 class="devh">お店の端末（LINEなし）</h2><div id="devs"><div class="boot"><div class="spinner" aria-hidden="true"></div></div></div>';
+      frame('<div class="day"><h1 class="title">スタッフ</h1></div><div class="sub">管理画面を使える人・端末</div>', h);
       $("#sadd").onclick = function () { staffForm(null); };
       on("[data-s]", function (el) { staffForm(r.staff.filter(function (x) { return x.id === el.getAttribute("data-s"); })[0]); });
+      showDevices();
     }, fail);
+  }
+
+  // ---------- お店の端末（HIROさんだけ）  marker: admin-device-v1 ----------
+  //   ここで6桁の番号を出し、お店のPC・タブレットで管理画面を開いて番号を入れると、その端末が登録される
+  var ADMIN_URL = CFG.ADMIN_URL || "https://cocokaraplus-max.github.io/lifeplus-app/admin/";
+  var DEV_PERMS = PERM_LABELS.filter(function (p) { return p[0] !== "notify"; });
+  function uaText(ua) {
+    ua = String(ua || "");
+    var os = /iPad/.test(ua) ? "iPad" : /iPhone/.test(ua) ? "iPhone" : /Android/.test(ua) ? "Android" : /Mac OS X/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : "";
+    var br = /Edg\//.test(ua) ? "Edge" : /CriOS|Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : /Firefox\//.test(ua) ? "Firefox" : "";
+    return [os, br].filter(Boolean).join("・");
+  }
+  function showDevices() {
+    api("admin_devices").then(function (r) {
+      var box = $("#devs"); if (!box || A.tab !== "staff") return;
+      box.innerHTML = '<div class="card" style="padding:4px 12px">' + (r.devices.length ? r.devices.map(function (d) {
+        var st = d.paired ? '<span class="pill reg">使えます</span>' : d.pairing ? '<span class="pill new">番号を出しています</span>' : '<span class="pill ns">まだ登録していません</span>';
+        var sub = permText(d.perms) + (d.paired ? "　" + (uaText(d.ua) ? uaText(d.ua) + "・" : "") + (d.lastSeen ? "最後に開いた日：" + mds(d.lastSeen) : "") : "");
+        return '<button class="cust" data-d="' + esc(d.id) + '"><span class="av">端</span>' +
+          '<span class="g"><span class="nm">' + esc(d.label) + "</span><br>" +
+          '<span class="sb">' + esc(sub) + "</span></span>" + st + "</button>";
+      }).join("") : '<div class="empty">まだありません。</div>') + "</div>" +
+        '<button class="btn mint wide" id="dadd">＋ お店の端末を登録する（番号を出す）</button>' +
+        '<p class="note">お店のPCやタブレットで、LINEを使わずに予約管理を開けるようにします。番号は15分・1回だけ使えます。' +
+        "端末ではLINEの通知は受け取れません。180日開かなかった端末は、登録が外れます。</p>";
+      $("#dadd").onclick = function () { deviceForm(null); };
+      on("[data-d]", function (el) { deviceForm(r.devices.filter(function (x) { return x.id === el.getAttribute("data-d"); })[0]); });
+    }, fail);
+  }
+  function deviceForm(d) {
+    var ps = d ? d.perms : ["bookings"];
+    openSheet("<h3>" + (d ? esc(d.label) : "お店の端末を登録する") + "</h3>" +
+      (d && d.paired ? '<p class="note">' + esc(uaText(d.ua) || "端末") + (d.pairedAt ? "　登録した日：" + mds(d.pairedAt) : "") + (d.lastSeen ? "　最後に開いた日：" + mds(d.lastSeen) : "") + "</p>" : "") +
+      '<label class="f"><span>呼び名（例：受付PC、施術室のiPad）</span><input id="dl" maxlength="30" value="' + esc(d ? d.label : "") + '"></label>' +
+      '<div class="f"><span>できること</span>' +
+      '<label class="check" style="color:var(--mute)"><input type="checkbox" checked disabled>予約表を見る（全員）</label>' +
+      DEV_PERMS.map(function (p) {
+        return '<label class="check"><input type="checkbox" data-dperm="' + p[0] + '"' + (ps.indexOf(p[0]) >= 0 ? " checked" : "") + ">" + esc(p[1]) + "</label>";
+      }).join("") + "</div>" +
+      (d ? '<button class="btn wide" id="ds">保存する</button>' : '<button class="btn mint wide" id="ds">番号を出す</button>') +
+      (d ? '<button class="btn line wide" id="dre">番号を出し直す' + (d.paired ? "（いまの端末は使えなくなります）" : "") + "</button>" : "") +
+      (d ? '<div class="danger-zone" style="text-align:center"><button class="link red" id="ddel">この端末を外す（管理画面を使えなくする）</button></div>' : "") +
+      '<button class="btn gray wide" id="dn">やめる</button>');
+    var perms = function () { return $$("[data-dperm]", $sb).filter(function (x) { return x.checked; }).map(function (x) { return x.getAttribute("data-dperm"); }); };
+    $("#dn").onclick = closeSheet;
+    $("#ds").onclick = function () {
+      var label = $("#dl").value.trim();
+      if (!label) { toast(ERR.label_required); return; }
+      if (d) busy($("#ds"), api("admin_device_update", { id: d.id, label: label, perms: perms() })).then(function () { closeSheet(); toast("保存しました"); showStaff(); }, fail);
+      else busy($("#ds"), api("admin_device_code", { label: label, perms: perms() })).then(function (r) { showPairCode(label, r); showStaff(); }, fail);
+    };
+    if ($("#dre")) $("#dre").onclick = function () {
+      busy($("#dre"), api("admin_device_code", { id: d.id })).then(function (r) { showPairCode(d.label, r); showStaff(); }, fail);
+    };
+    if ($("#ddel")) $("#ddel").onclick = function () {
+      confirmSheet("「" + d.label + "」を外しますか？", "外すと、その端末ではすぐに管理画面を開けなくなります。", "外す", function () {
+        return api("admin_device_del", { id: d.id }).then(function () { closeSheet(); toast("外しました"); showStaff(); });
+      });
+    };
+  }
+  function showPairCode(label, r) {
+    openSheet("<h3>「" + esc(label) + "」の番号</h3>" +
+      '<p class="pair-code" aria-label="番号">' + esc(r.code.slice(0, 3)) + "<span></span>" + esc(r.code.slice(3)) + "</p>" +
+      '<p class="note" style="text-align:center">' + untilText(r.expires) + "まで・1回だけ使えます</p>" +
+      '<ol class="pair-steps"><li>お店の端末のブラウザ（Safari・Chrome など）で、次のページを開きます<br><b class="mono">' + esc(ADMIN_URL) + "</b></li>" +
+      "<li>「この端末を登録する」に、上の番号を入れます</li></ol>" +
+      '<button class="btn line wide" id="pcopy">ページのアドレスをコピー</button>' +
+      '<button class="btn gray wide" id="pok">閉じる</button>' +
+      '<p class="note">番号は、登録する端末の前でだけ見せてください。LINEなどで送らないでください。</p>');
+    $("#pok").onclick = closeSheet;
+    $("#pcopy").onclick = function () {
+      var done = function () { toast("コピーしました"); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ADMIN_URL).then(done, function () { toast("長押しでコピーしてください"); });
+      else toast("長押しでコピーしてください");
+    };
+  }
+
+  // ---------- 端末を登録する画面（LINE を使わずに開くとき） ----------
+  function showPair(msg) {
+    A.init = null;
+    $app.innerHTML = '<div class="pair">' +
+      '<h1><b>LIFE PLUS</b> 予約管理</h1>' +
+      (msg ? '<p class="pair-msg">' + esc(msg) + "</p>" : "") +
+      '<div class="card"><h2>この端末を登録する</h2>' +
+      '<p class="note">HIROさんの管理画面（スタッフ → お店の端末）に出る6桁の番号を入れてください。登録すると、次からはこのページを開くだけで使えます。</p>' +
+      '<label class="f"><span>6桁の番号</span><input id="pc" inputmode="numeric" autocomplete="one-time-code" maxlength="7"></label>' +
+      '<button class="btn mint wide" id="pgo">登録する</button></div>' +
+      (window.liff && CFG.LIFF_ID ? '<button class="link" id="plogin">HIROさん・スタッフは LINE でログイン</button>' : "") +
+      "</div>";
+    var go = function () {
+      var c = $("#pc").value.replace(/[^0-9]/g, "");
+      if (c.length !== 6) { toast("番号は6桁です。"); return; }
+      busy($("#pgo"), fetch(CFG.API_URL, { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "device_pair", code: c, ua: navigator.userAgent.slice(0, 200) }) })
+        .then(function (r) { return r.json().catch(function () { return { error: "server_error" }; }); }, function () { return { error: "network" }; }))
+        .then(function (j) {
+          if (!j || !j.deviceToken) { toast(ERR[j && j.error] || ERR.server_error); return; }
+          A.dev = j.deviceToken; saveDev(j.deviceToken);
+          start().then(function () { toast("登録しました。次からはこのページを開くだけで使えます"); });
+        });
+    };
+    $("#pgo").onclick = go;
+    $("#pc").onkeydown = function (e) { if (e.key === "Enter") go(); };
+    if ($("#plogin")) $("#plogin").onclick = function () {
+      liff.init({ liffId: CFG.LIFF_ID }).then(function () { liff.login({ redirectUri: location.href.replace(/[?&]pair\b[^&]*/, "") }); });
+    };
   }
   function staffForm(s) {
     var ps = s ? s.perms : ["closures"];
@@ -971,23 +1097,32 @@
   document.addEventListener("visibilitychange", function () { if (!document.hidden && A.init && $sheet.hidden) refresh(); });
 
   // ---------- 起動 ----------
-  function boot() {
-    if (!window.liff || !CFG.LIFF_ID) { $app.innerHTML = '<div class="boot">ページの準備ができていません。</div>'; return; }
-    liff.init({ liffId: CFG.LIFF_ID }).then(function () {
-      if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
-      return joinIfInvited().then(function () { return api("admin_init"); }).then(function (d) {
-        A.init = d; A.date = d.today;
-        var q = /[?&]date=(\d{4}-\d{2}-\d{2})/.exec(location.search);
-        if (q) A.date = q[1];
-        return loadDay(A.date);
-      }, function (e) {
-        var code = e.join ? e.code : fail(e);
-        if (code !== "no_token" && code !== "token_invalid")
-          $app.innerHTML = '<div class="boot"><p>' + esc(ERR[code] || ERR.server_error) + '</p><button class="btn" style="max-width:260px" onclick="location.reload()">もう一度読み込む</button></div>';
-      });
-    }, function () {
-      $app.innerHTML = '<div class="boot">LINEとのつながりを準備できませんでした。LINEアプリから開き直してください。</div>';
+  function start() {
+    return (A.dev ? Promise.resolve() : joinIfInvited()).then(function () { return api("admin_init"); }).then(function (d) {
+      A.init = d; A.date = d.today; A.tab = "day";
+      var q = /[?&]date=(\d{4}-\d{2}-\d{2})/.exec(location.search);
+      if (q) A.date = q[1];
+      return loadDay(A.date);
+    }, function (e) {
+      var code = e.join ? e.code : fail(e);
+      if (code !== "no_token" && code !== "token_invalid" && code !== "device_invalid")
+        $app.innerHTML = '<div class="boot"><p>' + esc(ERR[code] || ERR.server_error) + '</p><button class="btn" style="max-width:260px" onclick="location.reload()">もう一度読み込む</button></div>';
     });
+  }
+  function boot() {
+    // admin-device-v1: 登録済みのお店の端末は、LINE を通さずに開く
+    A.dev = readDev();
+    if (A.dev) { start(); return; }
+    if (/[?&]pair\b/.test(location.search)) { showPair(""); return; }
+    if (!window.liff || !CFG.LIFF_ID) { showPair(""); return; }
+    liff.init({ liffId: CFG.LIFF_ID }).then(function () {
+      // LINE にログインしていないブラウザ（お店の端末など）では、まず番号の画面を出す
+      if (!liff.isLoggedIn()) {
+        if (/[?&]join=/.test(location.search)) { liff.login({ redirectUri: location.href }); return; }   // 招待リンクは LINE で
+        showPair(""); return;
+      }
+      return start();
+    }, function () { showPair(""); });
   }
   boot();
 })();
