@@ -41,7 +41,7 @@ with sync_playwright() as p:
     pg.on("pageerror", lambda e: errors.append(str(e)))
 
     # 1. 初めての人：ホーム → 登録 → ボディケア → メニュー → 日時 → 症状 → 確認 → 完了
-    pg.goto(BASE + "/")
+    pg.goto(BASE + "/yoyaku/")
     expect(pg.get_by_text("いまお取りしているご予約はありません")).to_be_visible()
     pg.screenshot(path=f"{SHOTS}/01_home.png")
     pg.get_by_role("button", name="新しく予約する").click()
@@ -139,7 +139,7 @@ with sync_playwright() as p:
     subprocess.run(["psql", "-h", "/var/tmp/lp_pgtest", "-p", "5544", "-U", "postgres", "-q", "-c",
                     "update customers set is_blocked=true where line_user_id='Uvendor'"], check=True)
     pg.evaluate("localStorage.setItem('u','vendor')")
-    pg.goto(BASE + "/")
+    pg.goto(BASE + "/yoyaku/")
     expect(pg.get_by_text("現在このアカウントではご予約を承れません").first).to_be_visible()
     check("ブロックした人には予約ボタンが出ない", pg.get_by_role("button", name="新しく予約する").count() == 0)
 

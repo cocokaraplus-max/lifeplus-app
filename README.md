@@ -31,3 +31,19 @@ deno run -A tests/e2e_server.ts & python3 tests/e2e_test.py      # 画面 11項�
 - 表の直し：`sql/lifeplus_hours_v2.sql`（business_hours に kind。お客さまの空き枠は kind='public' だけ）
 - 確かめ：`tests/settings_test.ts`（関所 9項目）・`tests/e2e_settings_test.py`（画面 16項目）
   ★空き枠は DB の now() で決まるので、テスト用DBでは now() をテストの「今」（2026-10-16 12:00）にそろえてから流す
+
+## 2026-10-23 ホームページ（marker: lifeplus-site-v1 / site-contact-v1）
+- `docs/` の入口をホームページにした。予約ページは `docs/yoyaku/` へ移した（中身は同じ。`config.js` は `docs/` に置いたまま、予約・管理画面の両方が読む）
+  | 場所 | 中身 |
+  |---|---|
+  | `docs/index.html` | トップ（ひとつの建物に3つの入口・3事業・予約と問い合わせのしかた・アクセス・会社） |
+  | `docs/dayservice/` | 機能訓練型デイサービス ココカラプラス（見学・相談のお問い合わせフォームつき） |
+  | `docs/sekkotsu/` | もみの木接骨院（受付時間・保険・交通事故のQ&A） |
+  | `docs/bodycare/` | HIROボディケアスタジオ（メニュー・プロフィール・Q&A） |
+  | `docs/site.css` `docs/site.js` | ホームページ共通の見た目・文字の大きさ・メニュー・フォーム |
+  | `docs/yoyaku/` | 予約ページ（LIFF） |
+- 予約ボタンは `https://liff.line.me/2012042545-nlHLpIre/yoyaku/`。リッチメニューの古いリンク（`…/2012042545-nlHLpIre`）でトップが開いたときは、LIFF の中なら予約ページへ移る
+- お問い合わせ：関所（booking）の `contact`。LINE のログインは要らない。`contact_messages` 表に残して、HIROさん（と「知らせ」の権限がある人）の LINE に知らせる
+  - いたずら・営業よけ：URL を書いたものは断る／見えない欄が埋まっている・開いて3秒以内は捨てる／同じ所から1時間に3件・全体で1日50件まで
+  - 表：`sql/lifeplus_contact_v1.sql`
+- 確かめ：`tests/contact_test.ts`（関所 7項目）・`tests/e2e_site_test.py`（画面 38項目・スマホとパソコン）

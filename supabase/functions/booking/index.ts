@@ -1,6 +1,6 @@
 // =============================================================
 // LIFE PLUS 予約  関所（Supabase Edge Function: booking）
-// marker: lifeplus-booking-fn-v1 / admin-notify-v1 / notify-contact-v1 / admin-api-v1 / staff-perms-v1
+// marker: lifeplus-booking-fn-v1 / admin-notify-v1 / notify-contact-v1 / admin-api-v1 / staff-perms-v1 / site-contact-v1
 //
 // 予約ページ（LIFF）からの依頼は、すべてここを通る。
 //   1. LINE の ID トークンを LINE 本体に問い合わせて、本人を確かめる
@@ -41,6 +41,8 @@ export interface Deps {
   now?: () => Date;
   // HIROさん・患者さんの LINE へ送る（失敗しても予約は止めない）
   notify?: (to: string[], text: string) => Promise<void>;
+  // site-contact-v1: お問い合わせを送ってきた所（いたずら止めにだけ使う。そのままは残さない）
+  clientIp?: string;
 }
 
 // ---------- 日付（日本時間） ----------
@@ -229,12 +231,75 @@ async function myBookings(sql: Sql, customerId: string, now: Date) {
   });
 }
 
+// ---------- ホームページのお問い合わせ  marker: site-contact-v1 ----------
+//   ★LINE でログインしなくても送れる（ご家族・ケアマネさん向け）。そのぶん、いたずら・営業を止める：
+//     ・URL（http・www）を書いたものは受け付けない（営業の文はたいてい URL を貼ってくる）
+//     ・人には見えない欄（website）が埋まっていたら機械とみなし、受け付けたふりをして捨てる
+//     ・開いてすぐ（3秒未満）に送られたものも機械とみなす
+//     ・同じ所から1時間に3件まで、ぜんぶで1日50件まで
+export const CONTACT_KINDS: Record<string, string[]> = {
+  day: ["見学したい", "利用について相談したい", "ケアマネジャーからの相談", "その他"],
+  sekkotsu: ["交通事故のこと", "その他"],
+  bodycare: ["メニューのこと", "その他"],
+  other: ["その他"],
+};
+const BIZ_LABEL: Record<string, string> = {
+  day: "デイサービス ココカラプラス", sekkotsu: "もみの木接骨院", bodycare: "HIROボディケアスタジオ", other: "LIFE PLUS",
+};
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+async function ipHash(ip: string): Promise<string | null> {
+  if (!ip) return null;
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("lp-contact:" + ip));
+  return Array.from(new Uint8Array(d)).slice(0, 12).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+// deno-lint-ignore no-explicit-any
+async function handleContact(body: any, deps: Deps, now: Date): Promise<Record<string, unknown>> {
+  const { sql } = deps;
+  const biz = str(body.business, 20);
+  if (!(biz in CONTACT_KINDS)) throw new ApiError("contact_invalid");
+  const kind = str(body.kind, 40);
+  if (!CONTACT_KINDS[biz].includes(kind)) throw new ApiError("contact_kind");
+  // 機械よけ（見えない欄が埋まっている・開いてすぐ送った）：受け付けたふりをして捨てる
+  if (str(body.website, 200) || Number(body.elapsed ?? 0) < 3000) return { ok: true };
+  const name = str(body.name, 40).normalize("NFKC");
+  if (!name) throw new ApiError("contact_name");
+  const org = str(body.org, 60).normalize("NFKC") || null;
+  const phone = normalizePhone(body.phone);
+  if (str(body.phone, 30) && !phone) throw new ApiError("phone_invalid");
+  const emailRaw = str(body.email, 120).normalize("NFKC");
+  const email = emailRaw ? (EMAIL_RE.test(emailRaw) ? emailRaw : null) : null;
+  if (emailRaw && !email) throw new ApiError("email_invalid");
+  if (!phone && !email) throw new ApiError("contact_reach");   // 折り返しの連絡先が1つは要る
+  const text = str(body.body, 800);
+  if (/https?:|www\.|\.(com|net|jp|io)\//i.test(text + " " + (org ?? "") + " " + name)) throw new ApiError("contact_link");
+  const ih = await ipHash(deps.clientIp ?? "");
+  if (ih) {
+    const r = await sql`select count(*)::int as n from contact_messages
+      where ip_hash = ${ih} and created_at > ${now.toISOString()}::timestamptz - interval '1 hour'`;
+    if (r[0].n >= 3) throw new ApiError("contact_too_many", 429);
+  }
+  const all = await sql`select count(*)::int as n from contact_messages
+    where created_at > ${now.toISOString()}::timestamptz - interval '1 day'`;
+  if (all[0].n >= 50) throw new ApiError("contact_too_many", 429);
+  await sql`insert into contact_messages (created_at, business, kind, name, org, phone, email, body, ip_hash)
+    values (${now.toISOString()}::timestamptz, ${biz}, ${kind}, ${name}, ${org}, ${phone}, ${email}, ${text || null}, ${ih})`;
+  const tel = phone ? (phone.length === 11 ? `${phone.slice(0, 3)}-${phone.slice(3, 7)}-${phone.slice(7)}`
+    : `${phone.slice(0, 4)}-${phone.slice(4, 6)}-${phone.slice(6)}`) : "";
+  await tellAdmin(deps, `【ホームページからお問い合わせ】${BIZ_LABEL[biz]}\n${kind}\n` +
+    `${name} 様` + (org ? `（${org}）` : "") + (tel ? `\n電話 ${tel}` : "") + (email ? `\nメール ${email}` : "") +
+    (text ? `\n\n${text}` : ""));
+  return { ok: true };
+}
+
 // ---------- 本体 ----------
 // deno-lint-ignore no-explicit-any
 export async function handle(body: any, deps: Deps): Promise<Record<string, unknown>> {
   const { sql } = deps;
   const now = (deps.now ?? (() => new Date()))();
   if (!body || typeof body !== "object") throw new ApiError("bad_request");
+
+  // site-contact-v1: ホームページのお問い合わせ（LINE のログインは要らない）
+  if (body.action === "contact") return await handleContact(body, deps, now);
 
   const token = str(body.idToken, 4000);
   if (!token) throw new ApiError("no_token", 401);
@@ -974,7 +1039,8 @@ if (DenoRT && DenoRT.env?.get("SUPABASE_DB_URL")) {
       return Response.json({ error: "bad_request" }, { status: 400, headers: cors });
     }
     try {
-      const out = await handle(body, { sql, verifyIdToken, notify });
+      const clientIp = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || (req.headers.get("x-real-ip") ?? "");
+      const out = await handle(body, { sql, verifyIdToken, notify, clientIp });   // site-contact-v1
       return Response.json(out, { headers: cors });
     } catch (e) {
       if (e instanceof ApiError) return Response.json({ error: e.code }, { status: e.status, headers: cors });
