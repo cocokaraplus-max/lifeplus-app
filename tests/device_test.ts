@@ -73,6 +73,22 @@ Deno.test({ name: "お店の端末", sanitizeOps: false, sanitizeResources: fals
       eq(await code(dev(tok, { action: "admin_customer_delete", customerId: lc })), "customer_has_line");
       await sql`delete from customers where id = ${lc}`;
     });
+    await t.step("スタッフ・設定を付けた端末は、スタッフ・端末の管理と設定ができる（device-perms-v2）", async () => {
+      eq(await code(dev(tok, { action: "admin_settings" })), "no_permission");
+      await hiro({ action: "admin_device_update", id, label: "受付PC", perms: ["customers", "staff", "settings"] });
+      eq((await dev(tok, { action: "admin_init" })).me.perms, ["customers", "staff", "settings"]);
+      eq(await code(dev(tok, { action: "admin_settings" })), "ok");
+      eq(await code(dev(tok, { action: "admin_staff" })), "ok");
+      eq(await code(dev(tok, { action: "admin_devices" })), "ok");
+      const r = await dev(tok, { action: "admin_device_code", label: "2台目", perms: ["bookings"] });
+      eq(/^\d{6}$/.test(r.code), true);
+      await dev(tok, { action: "admin_device_del", id: r.id });
+      // LINE のスタッフには付けられない（付けても消える）
+      const inv = await hiro({ action: "admin_staff_invite", label: "LINEの人", perms: ["staff", "settings", "bookings"] });
+      eq((await sql`select perms from staff_members where id = ${inv.id}`)[0].perms, ["bookings"]);
+      await sql`delete from staff_members`;
+      await hiro({ action: "admin_device_update", id, label: "受付PC", perms: ["customers"] });
+    });
     await t.step("番号を出し直すと、それまでの端末は使えなくなる", async () => {
       const r = await hiro({ action: "admin_device_code", id });
       eq(await code(dev(tok, { action: "admin_init" })), "device_invalid");

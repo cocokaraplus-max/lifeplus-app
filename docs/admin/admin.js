@@ -115,7 +115,11 @@
     ["bookings", "予約の確定・取消・来院の記録・手で予約", "予約"],
     ["customers", "お客さまの名簿・メモ・LINE連絡", "お客さま"],
     ["notify", "予約・キャンセルのLINE通知を受け取る", "通知"],
+    // device-perms-v2: お店の端末だけが持てる（LINE のスタッフには出さない）
+    ["staff", "スタッフ・お店の端末の管理（追加・外す）", "スタッフ"],
+    ["settings", "受付時間・予約の決まりごとの設定", "設定"],
   ];
+  var STAFF_PERMS = PERM_LABELS.filter(function (p) { return p[0] !== "staff" && p[0] !== "settings"; });
   function bizClass(id) { return id === "mominoki" ? "mo" : "bc"; }
   function bizName(id) { var b = (A.init.businesses || []).filter(function (x) { return x.id === id; })[0]; return b ? b.name : ""; }
   function isPast(b) { return Date.parse(b.startsAt) <= Date.now(); }
@@ -182,7 +186,7 @@
   function frame(barInner, mainHtml, extra) {
     var pc = A.day ? A.day.pendingCount : A.init.pendingCount;
     var tabs = [["day", "予約表"], ["pending", "確認待ち"], ["off", "休み"], ["cust", "お客さま"], ["staff", "スタッフ"], ["set", "設定"]].filter(function (t) {
-      return t[0] === "off" ? can("closures") : t[0] === "cust" ? can("customers") : t[0] === "staff" || t[0] === "set" ? owner() : true;
+      return t[0] === "off" ? can("closures") : t[0] === "cust" ? can("customers") : t[0] === "staff" ? can("staff") : t[0] === "set" ? can("settings") : true;   // device-perms-v2
     }).map(function (t) {
       return '<button data-tab="' + t[0] + '" class="' + (A.tab === t[0] ? "on" : "") + '"' + (A.tab === t[0] ? ' aria-current="page"' : "") + ">" +
         ICONS[t[0]] + t[1] + (t[0] === "pending" && pc ? '<span class="badge">' + pc + "</span>" : "") + "</button>";
@@ -892,6 +896,7 @@
       DEV_PERMS.map(function (p) {
         return '<label class="check"><input type="checkbox" data-dperm="' + p[0] + '"' + (ps.indexOf(p[0]) >= 0 ? " checked" : "") + ">" + esc(p[1]) + "</label>";
       }).join("") + "</div>" +
+      '<p class="note">「スタッフ」を付けると、この端末からも番号を出して端末を足したり、外したりできます。受付に置く端末に付けるときは、置き場所に気をつけてください。</p>' +
       (d ? '<button class="btn wide" id="ds">保存する</button>' : '<button class="btn mint wide" id="ds">番号を出す</button>') +
       (d ? '<button class="btn line wide" id="dre">番号を出し直す' + (d.paired ? "（いまの端末は使えなくなります）" : "") + "</button>" : "") +
       (d ? '<div class="danger-zone" style="text-align:center"><button class="link red" id="ddel">この端末を外す（管理画面を使えなくする）</button></div>' : "") +
@@ -967,7 +972,7 @@
       '<label class="f"><span>呼び名（自分用。例：受付さん、朋子）</span><input id="sl" maxlength="30" value="' + esc(s ? s.label : "") + '"></label>' +
       '<div class="f"><span>できること</span>' +
       '<label class="check" style="color:var(--mute)"><input type="checkbox" checked disabled>予約表を見る（全員）</label>' +
-      PERM_LABELS.map(function (p) {
+      STAFF_PERMS.map(function (p) {   // device-perms-v2: LINE のスタッフには「スタッフ」「設定」は出さない
         return '<label class="check"><input type="checkbox" data-perm="' + p[0] + '"' + (ps.indexOf(p[0]) >= 0 ? " checked" : "") + ">" + esc(p[1]) + "</label>";
       }).join("") + "</div>" +
       (s ? '<button class="btn wide" id="ss">保存する</button>' : '<button class="btn mint wide" id="ss">招待リンクを作る</button>') +
@@ -1068,7 +1073,7 @@
       '<label class="f"><span>ドタキャンが何回続いたら、通院中でも仮予約に戻すか</span><input type="number" id="sn" min="1" max="10" value="' + esc(S.noshowLimit) + '"></label>' +
       '<p class="note">締め切りと何日先までは、お客さまの予約ページに使われます。手で入れる予約には効きません。</p></div>';
     h += '<button class="btn mint wide" id="sgo">保存する</button><button class="btn gray wide" id="sre">元に戻す（保存しない）</button>';
-    frame('<div class="day"><h1 class="title">設定</h1></div><div class="sub">受付時間と予約の決まりごと（HIROさんだけ）</div>', h);
+    frame('<div class="day"><h1 class="title">設定</h1></div><div class="sub">受付時間と予約の決まりごと</div>', h);
     var num = function (el) { return Number(el.value); };
     on("[data-hadd]", function (el) {
       var w = Number(el.getAttribute("data-hadd")), same = S.hours.filter(function (x) { return x.weekday === w; });

@@ -133,7 +133,11 @@ const PERM_OF: Record<string, string | null> = {
   admin_closures: "closures", admin_closure_add: "closures", admin_closure_del: "closures",
   admin_decide: "bookings", admin_outcome: "bookings", admin_cancel: "bookings", admin_slots: "bookings", admin_book: "bookings",
   admin_customers: "customers", admin_customer: "customers", admin_customer_update: "customers", admin_message: "customers",
-  admin_customer_delete: "customers",   // customer-delete-staff-v1: HIROさん以外は、LINEなし・これからの予約なしの人だけ（下の runAdmin で見る）
+  admin_customer_delete: "customers",
+  // device-perms-v2: スタッフ・端末の管理と、設定。★お店の端末だけが持てる（LINE のスタッフは持てない：staff_perms_ok）
+  admin_staff: "staff", admin_staff_invite: "staff", admin_staff_update: "staff", admin_staff_del: "staff",
+  admin_devices: "staff", admin_device_code: "staff", admin_device_update: "staff", admin_device_del: "staff",
+  admin_settings: "settings", admin_settings_save: "settings",   // customer-delete-staff-v1: HIROさん以外は、LINEなし・これからの予約なしの人だけ（下の runAdmin で見る）
 };
 interface Me { owner: boolean; perms: string[]; label: string; staffId: string | null; deviceId?: string | null }
 async function staffOf(sql: Sql, sub: string): Promise<Me | null> {
@@ -257,7 +261,7 @@ async function ipHash(ip: string): Promise<string | null> {
 //  HIROさんが管理画面で6桁の番号を出す → お店の端末でその番号を入れる → 端末に長い合鍵（deviceToken）を渡す。
 //  ★番号も合鍵も、表にはハッシュだけ残す ★通知は受け取れない（LINE が無いので）
 //  ★180日開かなかった端末は使えなくなる ★番号を出し直すと、それまでの端末は使えなくなる
-const DEVICE_PERMS = ["closures", "bookings", "customers"];
+const DEVICE_PERMS = ["closures", "bookings", "customers", "staff", "settings"];   // device-perms-v2
 const PAIR_MINUTES = 15;
 const DEVICE_IDLE_DAYS = 180;
 const PAIR_FAILS_PER_IP_HOUR = 10;
@@ -361,7 +365,8 @@ async function runAdmin(me: Me, body: any, deps: Deps, now: Date): Promise<Recor
     return { ok: true };
   }
   const need = body.action in PERM_OF ? PERM_OF[body.action] : "owner";
-  if (need === "owner" ? !me.owner : need !== null && !me.perms.includes(need)) throw new ApiError("no_permission", 403);
+  // ★HIROさん（owner）は何でもできる。perms の中身では見ない（device-perms-v2 で「staff」「settings」を足したため）
+  if (!me.owner && (need === "owner" || (need !== null && !me.perms.includes(need)))) throw new ApiError("no_permission", 403);
   // customer-delete-staff-v1: お店の端末・スタッフが消せるのは、手で入れた人（LINEなし）で、これからの予約が無い人だけ
   //   ★LINE でつながっている人は、消してもまた予約ページを開けば作り直される。HIROさんだけにしておく
   //   ★これからの予約が入っている人を消すと、患者さんに知らせずに予約が消える。先に取り消してもらう
