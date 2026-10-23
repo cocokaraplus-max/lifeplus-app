@@ -259,3 +259,66 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
 .site-foot h4 { font-family: var(--en); font-weight: 400; color: #8b919a; font-size: 14px; margin: 0 0 10px; letter-spacing: .02em; }
 .site-foot .copy { grid-column: 1 / -1; border-top: 1px solid #3a3e45; padding-top: 18px; color: #8b919a; font-size: 13px; font-family: var(--en); }
 @media (max-width: 760px) { .site-foot .wrap { grid-template-columns: 1fr; } }
+
+/* ---------- スマホの形（lifeplus-site-v3）---------- */
+@media (max-width: 900px) {
+  /* 文字の大きさは、メニューを開いたときだけ出す（上の帯を1段にする） */
+  .site-top .size { display: none; }
+  .site-top .nav.open ~ .size { display: flex; order: 4; margin: 0 auto 12px; }
+}
+@media (max-width: 760px) {
+  section { padding: 52px 0; }
+  .sec-head { margin-bottom: 22px; }
+  .big-text { font-size: 19px; line-height: 1.85; letter-spacing: .01em; }
+  /* トップの最初：＋は右上に小さく、見出しを主役に */
+  .hero { padding: 20px 0 44px; }
+  .hero .wrap { display: block; position: relative; }
+  .hero-art { position: absolute; top: -6px; right: calc(var(--gut) * -0.4); width: 44%; max-width: 190px; margin: 0; }
+  .hero .place { margin: 18px 0 14px; }
+  .hero h1 { font-size: clamp(40px, 12vw, 54px); margin-top: 120px; }
+  .hero .lead { font-size: 16px; }
+  .hero .btn-row .btn { flex: 1 1 0; padding: 12px 10px; }
+  /* 事業ページの最初 */
+  .page-head { padding: 32px 0 28px; }
+  .page-head .deco { width: 150px; right: -36px; top: -30px; bottom: auto; opacity: .14; }
+  .page-head h1 { font-size: clamp(32px, 9.4vw, 44px); }
+  .page-head .lead { font-size: 16px; margin: 16px 0 22px; }
+  .page-head .btn-row { flex-direction: column; }
+  .page-head .btn-row .btn { width: 100%; }
+  .strip { margin-top: 24px !important; border-radius: 18px; }
+  .strip span { font-size: 15px; }
+  /* 3つの事業 */
+  .svc .name .en { font-size: 30px; }
+  .svc .name { padding-top: 26px; }
+  .svc .body { padding-bottom: 26px; gap: 12px; }
+  /* 予約・問い合わせ */
+  .reach > div { border-radius: 22px; padding: 22px; }
+  .reach .tel { font-size: 30px; }
+  .reach .btn { width: 100%; }
+  /* メニュー（料金）は、名前の下に値段 */
+  .menu-item { grid-template-columns: 1fr; gap: 2px; padding: 18px 0; }
+  .menu-item h3 { font-size: 19px; }
+  .menu-item .price { font-size: 26px; }
+  .menu-item.main { padding: 20px; }
+  .profile { grid-template-columns: 72px minmax(0, 1fr); gap: 16px; }
+  .profile .ph { width: 72px; font-size: 18px; }
+  .qa summary { font-size: 17px; padding: 18px 46px 18px 0; }
+  .addr { font-size: 19px; }
+  .map { min-height: 260px; border-radius: 20px; }
+  .site-foot .wrap { gap: 24px; }
+}
+@media (max-width: 760px) {
+  .hero-art { top: 34px; width: 40%; max-width: 170px; }
+  .hero h1 { margin-top: 128px; }
+  .profile { grid-template-columns: 72px minmax(0, 1fr); column-gap: 16px; row-gap: 0; align-items: center; }
+  .profile > div:not(.ph) { display: contents; }
+  .profile .ph { grid-row: 1 / span 2; }
+  .profile h3 { grid-column: 2; margin: 0; }
+  .profile p.muted { grid-column: 2; margin: 2px 0 0 !important; font-size: 14px; }
+  .profile p:not(.muted) { grid-column: 1 / -1; margin-top: 20px; }
+}
+@media (max-width: 760px) { .hero-art .p2 { right: 8%; } }
+/* メニューの縦の列を、おすすめの行もほかの行とそろえる（色の帯だけ外へはみ出す） */
+.menu-item.main { padding: 24px; margin: 14px -24px; }
+@media (max-width: 760px) { .menu-item.main { padding: 20px 12px; margin: 10px -12px; border-radius: 16px; } }
+@media (max-width: 560px) { .strip .two { font-size: 13px; letter-spacing: 0; white-space: nowrap; line-height: 1.7; } }

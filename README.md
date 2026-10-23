@@ -53,3 +53,10 @@ deno run -A tests/e2e_server.ts & python3 tests/e2e_test.py      # 画面 11項�
 - 書体：見出し Zen Kaku Gothic New・本文 BIZ UDPゴシック・英字 Outfit
 - ロゴ：`docs/img/`（logo.png・wordmark.png・wordmark-w.png・mark.svg＝ロゴの＋を描き直したもの・icon-*.png）
 - 見た目の確かめ：`FONTS_DIR=…（@fontsource の zen-kaku-gothic-new / outfit / biz-udpgothic を入れた所） python3 tests/e2e_site_test.py <写真の置き場>`
+
+## 2026-10-23 スマホの配置・文言（marker: lifeplus-site-v3）
+- スマホ：文字の大きさはメニューの中へ／トップの＋は見出しの右上／各ページの頭・営業時間の帯・メニュー・プロフィール・足もとを詰める
+- ボディケアのメニュー：おすすめの行も、名前と金額の縦の列をほかとそろえる。コース名を「ちょっとお試しコース／眠れるボディケアコース／至福のボディケアコース」に
+- デイ：種別に「介護予防通所サービス」、対象に要支援1・2を追加
+- 接骨院：「症状別の対応」・亜急性症状は保険外の説明を追加。各ページの「場所」を「アクセス」に
+- 確かめ：`tests/e2e_site_test.py`（画面 39項目）

@@ -56,6 +56,9 @@ with sync_playwright() as p:
         pg.goto(BASE + "/sekkotsu/")
         check(f"[{tag}] 接骨院の予約ボタン", pg.get_attribute(".act-bar .btn.line", "href") == "https://liff.line.me/2012042545-nlHLpIre/yoyaku/")
         # 文字の大きさ
+        if pg.locator(".menu-btn").is_visible():   # スマホでは文字の大きさはメニューの中
+            check(f"[{tag}] 文字の大きさはメニューを閉じている間は隠す", not pg.locator('[data-size="1.4"]').is_visible())
+            pg.click(".menu-btn")
         pg.click('[data-size="1.4"]'); check(f"[{tag}] 文字を特大に", pg.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--text-zoom').trim()") == "1.4")
         pg.click('[data-size="1"]')
         # 問い合わせ
