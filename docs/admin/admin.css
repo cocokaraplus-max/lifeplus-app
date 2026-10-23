@@ -247,4 +247,5 @@ main { padding-bottom: 90px; }
 .pair-steps li { margin: 6px 0; }
 .mono { font-family: ui-monospace, Menlo, monospace; font-weight: 400; font-size: 12.5px; word-break: break-all; }
 .devh { font-size: 17px; margin: 26px 0 8px; }
-.bar-top .devout { color: #fff; font-size: 12px; padding: 0; margin-left: auto; }
+.bar-top .gear { border: 1.5px solid rgba(255,255,255,.55); background: transparent; color: #fff; border-radius: 999px; width: 32px; height: 30px; font-size: 16px; line-height: 1; padding: 0; margin-left: 6px; flex: none; }   /* admin-device-v3 */
+.bar-top .sizes { margin-left: auto; }   /* admin-device-v3: ⚙ と並べても右に寄せる */

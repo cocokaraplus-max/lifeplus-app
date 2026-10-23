@@ -100,7 +100,9 @@ with sync_playwright() as p:
     # 5. 端末が自分で外す
     r = api("admin_device_code", label="iPad", perms=[])
     dp.fill("#pc", r["code"]); dp.click("#pgo")
-    expect(dp.locator("#devout")).to_be_visible()
+    expect(dp.locator("#devgear")).to_be_visible()
+    check("「登録を外す」は上の帯にそのままは出ない（⚙の中）", dp.locator("#devout").count() == 0)
+    dp.click("#devgear"); dp.screenshot(path=f"{SHOTS}/d04_gear.png")
     dp.click("#devout"); dp.locator(".sheet button", has_text="外す").last.click()
     expect(dp.locator(".pair-msg")).to_contain_text("登録を外しました")
     check("自分で外すと、合鍵も消える", dp.evaluate("localStorage.getItem('lp_admin_device')") is None)

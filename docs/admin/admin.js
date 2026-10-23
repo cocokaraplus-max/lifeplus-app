@@ -186,15 +186,23 @@
     }).join("");
     $app.innerHTML =
       '<header class="bar"><div class="bar-top"><span><b>LIFE PLUS</b>　予約管理' + (owner() ? "" : "（" + esc(A.init.me.label) + "）") + "</span>" +
-      (A.dev ? '<button class="link devout" id="devout">登録を外す</button>' : "") + sizes() + "</div>" + barInner + "</header>" +
+      sizes() + (A.dev ? '<button class="gear" id="devgear" aria-label="この端末の設定">⚙</button>' : "") + "</div>" + barInner + "</header>" +
       "<main>" + mainHtml + "</main>" + (extra || "") +
       '<nav class="tabs" aria-label="切り替え">' + tabs + "</nav>";
     on("[data-tab]", function (b) { go(b.getAttribute("data-tab")); });
     on("[data-size]", function (b) { setZoom(Number(b.getAttribute("data-size"))); });
-    if ($("#devout")) $("#devout").onclick = function () {
-      confirmSheet("この端末の登録を外しますか？", "外すと、この端末では管理画面を開けなくなります。また使うときは、HIROさんに新しい番号をもらいます。", "外す", function () {
-        return api("admin_device_forget").then(function () { clearDev(); closeSheet(); showPair("登録を外しました。"); });
-      });
+    // admin-device-v3: 「登録を外す」は、うっかり押さないよう⚙の中にしまう
+    if ($("#devgear")) $("#devgear").onclick = function () {
+      openSheet("<h3>この端末の設定</h3>" +
+        '<p class="note">この端末は「' + esc(A.init.me.label) + '」として登録されています。LINEを使わずに予約管理を開けます。</p>' +
+        '<div class="danger-zone" style="text-align:center;margin-top:24px"><button class="link red" id="devout">この端末の登録を外す</button></div>' +
+        '<button class="btn gray wide" id="devclose">閉じる</button>');
+      $("#devclose").onclick = closeSheet;
+      $("#devout").onclick = function () {
+        confirmSheet("この端末の登録を外しますか？", "外すと、この端末では管理画面を開けなくなります。また使うときは、HIROさんに新しい番号をもらいます。", "外す", function () {
+          return api("admin_device_forget").then(function () { clearDev(); closeSheet(); showPair("登録を外しました。"); });
+        });
+      };
     };
   }
   function go(tab) {
