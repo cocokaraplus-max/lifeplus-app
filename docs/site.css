@@ -1044,3 +1044,17 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   .site-foot .wrap { grid-template-columns: minmax(0, 1fr); }
   .site-foot .foot-pc { display: none; }
 }
+
+/* ---------- スマホのフッター：左そろえ＋＋の透かし（lifeplus-foot-sp-v1）---------- */
+@media (max-width: 760px) {
+  .site-foot { position: relative; padding-top: 48px; overflow: hidden; }
+  .site-foot::after { content: ""; position: absolute; right: -60px; top: -40px; width: 220px; height: 220px; opacity: .10;
+    background: url(img/mark.svg) center / contain no-repeat; pointer-events: none; }
+  .site-foot .wrap { position: relative; z-index: 1; }
+  .site-foot .wm { height: 24px; margin: 0 0 18px; }
+  .site-foot .wrap > div:first-child p:first-of-type { font-family: var(--head); font-weight: 700; color: #fff; font-size: 15px; margin: 0 0 6px; }
+  .site-foot .wrap > div:first-child p:nth-of-type(2) { font-size: 13px; color: #9aa0a8; line-height: 1.7; margin: 0; padding-left: 12px; border-left: 2px solid var(--green); }
+  .site-foot .copy { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; padding-top: 18px; }
+  .site-foot .copy a { font-size: 12px; color: #cfd3d8; }
+  .site-foot .copy > span { font-size: 11px; }
+}
