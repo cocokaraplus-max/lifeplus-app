@@ -410,3 +410,9 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   .photos figure:first-child { grid-column: 1 / -1; border-bottom-left-radius: 56px; }
   .photos.two figure:nth-child(2) { grid-column: 1 / -1; aspect-ratio: 16 / 9; }
 }
+
+/* ---------- 経歴の年表（lifeplus-career-v2）---------- */
+.career { display: grid; grid-template-columns: 4.6em minmax(0, 1fr); margin: 0 0 22px; border-top: 1px solid var(--line); }
+.career dt, .career dd { margin: 0; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.career dt { font-family: var(--en); font-weight: 500; color: var(--ci, var(--ink)); }
+@media (max-width: 760px) { .profile .career { grid-column: 1 / -1; margin-top: 20px; } }
