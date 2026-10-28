@@ -758,3 +758,16 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   .oneday-item figure { flex: 0 0 32%; aspect-ratio: 1; }
   .feature > div > .feat-ph { max-width: 260px; }
 }
+
+/* ---------- デイの写真の大きさ その2（lifeplus-day-photo-size-v2）----------
+   季節の行事は 3:2、日曜の1日型はパソコンでも「左に小さな写真・右に文」 */
+.season-ph figure:first-child, .season-ph.empty { aspect-ratio: 3 / 2; }
+.oneday-grid { grid-template-columns: minmax(0, 1fr); max-width: 900px; gap: 14px; }
+.oneday-item { flex-direction: row; align-items: center; }
+.oneday-item figure { flex: 0 0 160px; width: 160px; height: 160px; aspect-ratio: auto; margin: 14px 0 14px 14px; border-radius: 16px; }
+.oneday-item > div { padding: 16px 24px; }
+@media (max-width: 760px) {
+  .oneday-item { align-items: flex-start; }
+  .oneday-item figure { flex: 0 0 92px; width: 92px; height: 92px; margin: 12px 0 12px 12px; border-radius: 12px; }
+  .oneday-item > div { padding: 12px 14px; }
+}
