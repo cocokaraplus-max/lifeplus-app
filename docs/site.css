@@ -847,3 +847,29 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   .portrait-sub { width: 40%; right: 0; border-width: 4px; }
   .thought { padding: 18px 16px; }
 }
+
+/* ---------- ボディケアの入ってすぐの3枚（lifeplus-body-photos-small-v1）----------
+   小さな写真を、大きさを変えて段違いに。後ろに紫の枠をずらして重ねる */
+.photos-band:has(.photos.small) { overflow-x: clip; }
+.photos.small:not(.two) { display: flex; align-items: flex-start; gap: 0; padding-top: 10px; padding-bottom: 46px; position: relative; }
+.photos.small:not(.two) figure, .photos.small:not(.two) figure + figure { aspect-ratio: 1; flex: none; grid-column: auto; position: relative; overflow: visible; background: none; }
+.photos.small:not(.two) figure img { border-radius: 22px; position: relative; z-index: 1; box-shadow: 0 22px 40px -26px rgba(62,50,86,.6); }
+.photos.small:not(.two) figure:nth-child(1) { width: 250px; z-index: 2; }
+.photos.small:not(.two) figure:nth-child(1) img { border-bottom-left-radius: 80px; }
+.photos.small:not(.two) figure:nth-child(1)::before { content: ""; position: absolute; inset: 16px -16px -16px 16px; border: 2px solid var(--plum); border-radius: 22px 22px 22px 80px; opacity: .35; }
+.photos.small:not(.two) figure:nth-child(2) { width: 190px; margin: 70px 0 0 -18px; z-index: 3; }
+.photos.small:not(.two) figure:nth-child(2) img { border: 6px solid #fff; border-radius: 50%; }
+.photos.small:not(.two) figure:nth-child(3) { width: 210px; margin: 6px 0 0 22px; z-index: 1; }
+.photos.small:not(.two) figure:nth-child(3) img { border-top-right-radius: 80px; }
+.photos.small:not(.two) figure:nth-child(3)::after { content: ""; position: absolute; width: 64px; height: 64px; right: -20px; bottom: -20px; border-radius: 50%; background: var(--plum-soft); z-index: 0; }
+@media (max-width: 560px) {
+  .photos.small:not(.two) { padding-bottom: 34px; }
+  .photos.small:not(.two) figure:nth-child(1) { width: 40%; }
+  .photos.small:not(.two) figure:nth-child(1) img { border-radius: 16px 16px 16px 48px; }
+  .photos.small:not(.two) figure:nth-child(1)::before { inset: 10px -10px -10px 10px; border-radius: 16px 16px 16px 48px; }
+  .photos.small:not(.two) figure:nth-child(2) { width: 32%; margin: 44px 0 0 -10px; }
+  .photos.small:not(.two) figure:nth-child(2) img { border-width: 4px; }
+  .photos.small:not(.two) figure:nth-child(3) { width: 29%; margin: 4px 0 0 8px; }
+  .photos.small:not(.two) figure:nth-child(3) img { border-radius: 16px 48px 16px 16px; }
+  .photos.small:not(.two) figure:nth-child(3)::after { width: 40px; height: 40px; right: -4px; bottom: -12px; }
+}
