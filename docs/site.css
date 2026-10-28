@@ -873,3 +873,8 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   .photos.small:not(.two) figure:nth-child(3) img { border-radius: 16px 48px 16px 16px; }
   .photos.small:not(.two) figure:nth-child(3)::after { width: 40px; height: 40px; right: -4px; bottom: -12px; }
 }
+
+/* ---------- 理由の数字の幅をそろえる（lifeplus-reason-align-v1）---------- */
+.reason-list > li { grid-template-columns: clamp(76px, 9vw, 124px) minmax(0, 1fr); }
+.reason-list .rn { font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) { .reason-list > li { grid-template-columns: minmax(0, 1fr); } }
