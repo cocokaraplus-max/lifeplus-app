@@ -993,3 +993,8 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   .sec-head h2 br { display: none; }
   .reasons .sec-head h2 br, .sec-head h2 br:has(+ small) { display: inline; }
 }
+
+/* ---------- 接骨院もポラロイド風に（lifeplus-kotsu-polaroid-v1）---------- */
+.photos.polaroid:not(:has(figure:nth-child(3))) figure { width: min(250px, 40%); }
+.c-kotsu .photos.polaroid figure::after { color: var(--green-ink); }
+.c-kotsu .photos.polaroid figure::before { background: rgba(238,247,228,.88); }
