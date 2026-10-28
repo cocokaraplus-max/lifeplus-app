@@ -983,3 +983,7 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   box-shadow: inset 0 10px 18px -12px rgba(40,25,10,.45), inset 0 -10px 18px -12px rgba(40,25,10,.35); }
 .c-day .insta { margin-top: clamp(22px, 3vw, 34px); }
 @media (max-width: 560px) { .photos.polaroid { padding-top: 30px; padding-bottom: 34px; } }
+
+/* ---------- ココカラプラスのポラロイド5枚（lifeplus-day-polaroid-walk-v1）---------- */
+.photos.polaroid:has(figure:nth-child(5)):has(figure.wide) figure { width: min(200px, 18.6%); }
+.photos.polaroid:has(figure:nth-child(5)):has(figure.wide) figure.wide { width: min(280px, 25.6%); }
