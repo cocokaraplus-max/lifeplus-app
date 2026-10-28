@@ -460,3 +460,14 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   .app-card { order: -1; aspect-ratio: 16 / 9; border-radius: 22px 22px 22px 64px; }
   .app-band .btn { width: 100%; }
 }
+
+/* ---------- Instagram（lifeplus-insta-v1）---------- */
+.insta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 16px; }
+.insta-lb { display: inline-flex; align-items: center; gap: 8px; margin: 0 6px 0 0; font-weight: 700; color: var(--ci); }
+.insta svg { width: 20px; height: 20px; }
+.insta a { display: inline-flex; flex-direction: column; text-decoration: none; background: var(--cs); color: var(--ink);
+  border-radius: 16px; padding: 8px 18px; line-height: 1.45; }
+.insta a b { font-family: var(--en); font-weight: 500; color: var(--ci); }
+.insta a span { font-size: 13px; color: var(--sub); }
+.insta a:hover { outline: 2px solid var(--c); }
+@media (max-width: 560px) { .insta a { flex: 1 1 100%; } }
