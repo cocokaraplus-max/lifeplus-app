@@ -788,3 +788,62 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   .photos.two.small figure, .photos.two.small figure + figure { border-radius: 14px; }
   .photos.two.small figure:first-child { border-bottom-left-radius: 40px; }
 }
+
+/* ---------- ボディケア：選ばれる理由・推薦・想い・お客様の声（lifeplus-body-profile-v1）---------- */
+.reason-list { list-style: none; margin: 0; padding: 0; display: grid; gap: clamp(28px, 4vw, 48px); }
+.reason-list > li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: clamp(16px, 3vw, 40px); align-items: start;
+  padding-top: clamp(22px, 3vw, 32px); border-top: 1px solid rgba(90,75,120,.18); }
+.reason-list .rn { font-size: clamp(44px, 6vw, 80px); line-height: .9; font-weight: 300; color: transparent;
+  -webkit-text-stroke: 1.5px var(--plum); letter-spacing: .02em; }
+.reason-list h3 { font-size: clamp(20px, 2.2vw, 26px); color: var(--plum-ink); margin: 4px 0 12px; }
+.reason-list p { margin: 0; color: var(--ink); max-width: 46em; }
+.rec-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(14px, 2vw, 24px); margin-top: 8px; }
+.rec { margin: 0; background: #fff; border-radius: 22px; padding: 26px 24px 20px; position: relative; display: flex; flex-direction: column;
+  box-shadow: 0 18px 40px -30px rgba(62,50,86,.55); }
+.rec::before { content: "\201C"; position: absolute; top: -6px; left: 18px; font-family: Georgia, serif; font-size: 72px; line-height: 1; color: var(--plum); opacity: .25; }
+.rec blockquote { margin: 0 0 18px; font-size: 15px; line-height: 1.9; color: var(--ink); }
+.rec blockquote p { margin: 0 0 .6em; }
+.rec figcaption { margin-top: auto; display: flex; align-items: center; gap: 14px; padding-top: 16px; border-top: 1px dashed rgba(90,75,120,.25); }
+.rec figcaption img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; object-position: 50% 25%; flex: none; box-shadow: 0 0 0 3px var(--plum-soft); }
+.rec figcaption small { display: block; font-size: 12px; line-height: 1.6; color: var(--sub); }
+.rec figcaption b { display: block; font-family: var(--head); font-size: 18px; color: var(--plum-ink); margin-top: 2px; }
+.rec figcaption b i { font-style: normal; font-size: 13px; font-weight: 500; }
+.portrait-wrap { position: relative; max-width: 400px; padding-bottom: 70px; }
+.portrait-wrap .portrait { margin-top: 28px; }
+.portrait-sub { position: absolute; right: -10px; bottom: 0; width: 42%; aspect-ratio: 3 / 4; object-fit: cover; object-position: 50% 30%;
+  border-radius: 18px; border: 5px solid #fff; box-shadow: 0 16px 34px -18px rgba(35,38,43,.45); }
+.thought { margin-top: 26px; padding: 22px 24px; border-radius: 22px; background: var(--plum-soft); }
+.thought h4 { font-family: var(--head); font-size: 18px; color: var(--plum-ink); margin: 0 0 10px; }
+.thought p { margin: 0 0 .9em; font-size: 15.5px; line-height: 1.95; }
+.thought .more summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-weight: 700; color: var(--plum-ink);
+  font-size: 14px; padding: 6px 14px; border-radius: 999px; background: #fff; margin: 0 0 14px; }
+.thought .more summary::-webkit-details-marker { display: none; }
+.thought .more summary::after { content: ""; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translateY(-2px); transition: transform .2s; }
+.thought .more[open] summary::after { transform: rotate(-135deg) translateX(-2px); }
+.thought .more .m-close, .thought .more[open] .m-open { display: none; }
+.thought .more[open] .m-close { display: inline; }
+.thought .thought-end { margin: 6px 0 0; font-family: var(--head); font-weight: 700; color: var(--plum-ink); }
+.voice-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(14px, 2vw, 24px); align-items: stretch; }
+.voice { background: #fff; border: 1px solid var(--line); border-radius: 22px; padding: 24px 22px 18px; }
+.voice .v-head { font-family: var(--head); font-weight: 700; font-size: 18px; line-height: 1.6; color: var(--plum-ink); margin: 0 0 8px; }
+.voice .v-head::before { content: "\201C"; font-family: Georgia, serif; color: var(--plum); opacity: .4; margin-right: 2px; }
+.voice .v-who { font-size: 13px; color: var(--sub); margin: 0 0 12px; }
+.voice summary { cursor: pointer; font-size: 14px; font-weight: 700; color: var(--plum); list-style: none; }
+.voice summary::-webkit-details-marker { display: none; }
+.voice summary::after { content: " ＋"; }
+.voice details[open] summary::after { content: " －"; }
+.voice dl { margin: 12px 0 0; font-size: 14px; line-height: 1.8; }
+.voice dt { color: var(--sub); font-size: 13px; margin-top: 10px; }
+.voice dt::before { content: "Q. "; color: var(--plum); font-weight: 700; }
+.voice dd { margin: 2px 0 0; }
+@media (max-width: 860px) {
+  .portrait-wrap { max-width: 520px; padding-bottom: 56px; }
+  .portrait-wrap .portrait { margin-top: 18px; }
+  .rec-list, .voice-list { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .reason-list > li { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .reason-list .rn { font-size: 44px; }
+  .portrait-sub { width: 40%; right: 0; border-width: 4px; }
+  .thought { padding: 18px 16px; }
+}
