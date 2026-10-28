@@ -1058,3 +1058,21 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   .site-foot .copy a { font-size: 12px; color: #cfd3d8; }
   .site-foot .copy > span { font-size: 11px; }
 }
+
+/* ---------- 上の札（スマホは横並びの白い札）・1行の文・フッターの＋（lifeplus-strip-a-v1）---------- */
+.big-text.one-line { white-space: nowrap; font-size: min(28px, 2.1vw); max-width: none; letter-spacing: 0; }
+@media (max-width: 860px) { .big-text.one-line { font-size: min(26px, calc((100vw - 40px) / 22.5)); } }
+@media (max-width: 560px) {
+  .strip { display: block !important; background: #fff; border-radius: 22px; padding: 6px 18px; box-shadow: 0 16px 34px -26px rgba(35,38,43,.5); }
+  .strip > div, .strip > div:nth-child(2n) { display: grid; grid-template-columns: 5.8em minmax(0, 1fr); align-items: center; gap: 10px;
+    padding: 15px 0; border: 0; border-bottom: 1px dashed var(--line); }
+  .strip > div:last-child { border-bottom: 0; }
+  .strip b { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 12px; letter-spacing: .06em; }
+  .strip b::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 4px var(--cs); flex: none; }
+  .strip span { font-size: 16px; line-height: 1.55; }
+  .strip .two { white-space: normal; font-size: 14px; letter-spacing: 0; line-height: 1.65; }
+  .strip span { overflow-wrap: anywhere; }
+}
+@media (max-width: 760px) {
+  .site-foot::after { width: 340px; height: 340px; right: -120px; top: 50%; margin-top: -170px; opacity: .09; }
+}
