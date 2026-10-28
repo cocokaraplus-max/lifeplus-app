@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /admin/
+Disallow: /yoyaku/
+
+Sitemap: https://lifeplusllc.com/sitemap.xml

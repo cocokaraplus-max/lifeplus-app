@@ -877,7 +877,7 @@
 
   // ---------- お店の端末（HIROさんだけ）  marker: admin-device-v1 ----------
   //   ここで6桁の番号を出し、お店のPC・タブレットで管理画面を開いて番号を入れると、その端末が登録される
-  var ADMIN_URL = CFG.ADMIN_URL || "https://cocokaraplus-max.github.io/lifeplus-app/admin/";
+  var ADMIN_URL = CFG.ADMIN_URL || "https://lifeplusllc.com/admin/";
   var DEV_PERMS = PERM_LABELS.filter(function (p) { return p[0] !== "notify"; });
   function uaText(ua) {
     ua = String(ua || "");
