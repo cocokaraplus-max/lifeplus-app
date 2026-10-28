@@ -416,3 +416,15 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
 .career dt, .career dd { margin: 0; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .career dt { font-family: var(--en); font-weight: 500; color: var(--ci, var(--ink)); }
 @media (max-width: 760px) { .profile .career { grid-column: 1 / -1; margin-top: 20px; } }
+
+/* ---------- トップの集合写真（lifeplus-hero-v2）---------- */
+.hero .wrap:has(.hero-photo.wide) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); }
+.hero:has(.hero-photo.wide) h1 { font-size: clamp(44px, 6.2vw, 86px); }
+.hero-photo.wide > img:first-child { aspect-ratio: 4 / 3; object-position: 50% 60%; border-radius: 32px 32px 32px 120px; }
+.hero-photo.wide .mk { width: 20%; left: auto; right: -5%; top: -9%; bottom: auto; }  /* 空の上に置いて、人に重ねない */
+@media (max-width: 760px) {
+  .hero .wrap:has(.hero-photo.wide) { display: flex; }
+  .hero:has(.hero-photo.wide) h1 { font-size: clamp(40px, 12vw, 54px); }
+  .hero-photo.wide > img:first-child { border-radius: 22px 22px 22px 76px; }
+  .hero-photo.wide .mk { width: 22%; left: auto; right: -3%; top: auto; bottom: -9%; }
+}
