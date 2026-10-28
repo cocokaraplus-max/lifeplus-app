@@ -1009,3 +1009,19 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   .fig.fig-mini img { width: 92px; height: 92px; border-radius: 12px; }
   .fig.fig-mini figcaption { font-size: 13px; }
 }
+
+/* ---------- スマホの「3つの事業」を短い札に（lifeplus-svc-compact-v1）---------- */
+.svc .nw { display: inline-block; }
+@media (max-width: 860px) {
+  .svc, .svc:last-child { border: 0; display: grid; grid-template-columns: 84px minmax(0, 1fr) 36px; grid-template-areas: "ph name go";
+    align-items: center; gap: 12px; background: var(--cs); border-radius: 22px; padding: 12px 12px 12px 12px; margin: 0 0 12px; }
+  .svc .ph { grid-area: ph; margin: 0; width: 84px; height: 84px; aspect-ratio: 1; border-radius: 16px; }
+  .svc .name { grid-area: name; padding: 0; gap: 2px; }
+  .svc .name .en { font-size: 13px; letter-spacing: .03em; }
+  .svc .name h3 { font-size: 17px; letter-spacing: 0; word-break: keep-all; overflow-wrap: anywhere; }
+  .svc .name .kind { font-size: 12px; line-height: 1.5; }
+  .svc .body { grid-area: go; padding: 0; }
+  .svc .body p, .svc .body .tags { display: none; }
+  .svc .more { font-size: 0; gap: 0; }
+  .svc .more::after { width: 34px; height: 34px; }
+}
