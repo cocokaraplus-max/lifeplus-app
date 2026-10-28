@@ -587,3 +587,26 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
 .btn .ig-mark { width: 22px; height: 22px; }
 @media (max-width: 560px) { .insta a.insta-card { flex: initial; } }
 
+/* ---------- 中くらいの幅のメニュー・スマホの写真の列（lifeplus-layout-v1）----------
+   ・メニューの文字が2行に折れる幅（だいたい1200より狭い）では、スマホと同じ「メニュー」ボタンにする
+   ・写真の列は、スマホでも横に並べる（小さくなってよい） */
+.nav a, .size button, .size-lb, .menu-btn { white-space: nowrap; }
+@media (max-width: 1200px) {
+  .menu-btn { display: block; }
+  .site-top .wrap { flex-wrap: wrap; gap: 10px; min-height: 64px; padding-top: 8px; padding-bottom: 8px; }
+  .nav { display: none; flex-basis: 100%; flex-direction: column; align-items: stretch; padding: 4px 0 10px; }
+  .nav.open { display: flex; }
+  .nav a { padding: 14px 16px; border-radius: 12px; font-size: 18px; }
+  .nav a[aria-current="page"]::after { display: none; }
+  .nav a[aria-current="page"] { background: var(--cs, var(--orange-soft)); }
+  .nav .rsv { margin: 6px 0 0; text-align: center; }
+  .site-top .size { display: none; }
+  .site-top .nav.open ~ .size { display: flex; order: 4; margin: 0 auto 12px; }
+}
+@media (max-width: 560px) {
+  .photos, .photos.two { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 8px; }
+  .photos:not(.two) { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); }
+  .photos figure { border-radius: 12px; }
+  .photos figure:first-child { grid-column: auto; border-bottom-left-radius: 36px; }
+  .photos figure + figure, .photos.two figure:nth-child(2) { grid-column: auto; aspect-ratio: auto; }
+}
