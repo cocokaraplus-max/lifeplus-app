@@ -344,3 +344,69 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   .motto .sub::before, .motto .sub::after { display: none; }
   .motto .word { letter-spacing: .12em; padding-left: .12em; }
 }
+
+/* ---------- 写真（lifeplus-site-photos-v1）----------
+   ・写真は角を大きく丸め、最初の1枚だけ左下を大きくえぐる（ロゴの＋のやわらかさに合わせる） */
+.hero-photo { position: relative; margin: 0; }
+.hero-photo > img:first-child { width: 100%; aspect-ratio: 1; object-fit: cover; object-position: 58% 50%;
+  border-radius: 32px 32px 32px 140px; box-shadow: 0 24px 60px rgba(35, 38, 43, .12); }
+.hero-photo .mk { position: absolute; width: 28%; height: auto; left: -8%; bottom: -6%;
+  filter: drop-shadow(0 10px 22px rgba(35, 38, 43, .18)); }
+@media (prefers-reduced-motion: no-preference) {
+  .hero-photo > img:first-child { animation: ph-in 1000ms ease-out both; }
+  .hero-photo .mk { animation: drop 900ms cubic-bezier(.2,.8,.2,1.05) both 450ms; }
+}
+@keyframes ph-in { from { opacity: 0; transform: scale(1.03); } to { opacity: 1; transform: none; } }
+
+.svc { grid-template-columns: minmax(0, 3fr) minmax(0, 4fr) minmax(0, 5fr); column-gap: clamp(20px, 3vw, 44px); align-items: center; }
+.svc .ph { margin: clamp(20px, 3vw, 32px) 0; overflow: hidden; border-radius: 22px; aspect-ratio: 4 / 3; background: var(--cs); }
+.svc .ph img { width: 100%; height: 100%; object-fit: cover; transition: transform .6s ease; }
+.svc:hover .ph img { transform: scale(1.04); }
+.svc .body { padding-left: 0; }
+.svc .name .en { font-size: clamp(28px, 3.3vw, 44px); }
+
+.bldg { width: 100%; max-width: 440px; border-radius: 20px; margin: 4px 0 22px; }
+
+.photos-band { padding: clamp(28px, 4vw, 52px) 0 0; }
+.photos { display: grid; gap: clamp(10px, 1.6vw, 20px); grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr); }
+.photos.two { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+.photos figure { margin: 0; overflow: hidden; border-radius: 24px; aspect-ratio: 4 / 3; background: var(--mist); }
+.photos figure:first-child { border-bottom-left-radius: 96px; }
+.photos img { width: 100%; height: 100%; object-fit: cover; }
+.photos figure.illust img { object-position: 50% 62%; }
+.photos figure + figure { aspect-ratio: auto; }  /* 2枚目からは1枚目の高さにそろえる */
+.photos-band + section { padding-top: clamp(48px, 7vw, 96px); }
+
+.fig { margin: 32px 0 0; }
+.fig img { width: 100%; max-width: 520px; border-radius: 22px; }
+.fig figcaption { font-size: 14px; color: var(--sub); margin-top: 10px; max-width: 36em; }
+
+.portrait { display: block; width: 100%; max-width: 340px; aspect-ratio: 4 / 5; object-fit: cover; object-position: 50% 35%;
+  border-radius: 24px 24px 24px 96px; margin-top: 28px; }
+.profile .ph { overflow: hidden; }
+.profile .ph img { width: 100%; height: 100%; object-fit: cover; }
+.profile.has-portrait { grid-template-columns: minmax(0, 1fr); }
+.profile.has-portrait .ph { display: none; }
+
+@media (max-width: 860px) { .portrait { display: none; } .profile.has-portrait .ph { display: grid; }
+  .profile.has-portrait { grid-template-columns: auto minmax(0, 1fr); } }
+@media (max-width: 760px) {
+  .hero .wrap { display: flex; flex-direction: column; }
+  .hero-photo { order: -1; margin: 4px 0 6px; }
+  .hero-photo > img:first-child { aspect-ratio: 4 / 3; border-radius: 22px 22px 22px 76px; }
+  .hero-photo .mk { width: 24%; left: auto; right: -3%; bottom: -9%; }
+  .hero .place { margin-top: 26px; }
+  .hero h1 { margin-top: 0; }
+  .svc { grid-template-columns: 1fr; }
+  .svc .ph { margin: 26px 0 0; aspect-ratio: 16 / 9; border-radius: 18px; }
+  .svc .name { padding-top: 16px; }
+  .profile.has-portrait { grid-template-columns: 72px minmax(0, 1fr); }
+  .bldg { max-width: none; }
+}
+@media (max-width: 560px) {
+  .photos, .photos.two { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .photos figure { border-radius: 16px; }
+  .photos figure + figure { aspect-ratio: 4 / 3; }
+  .photos figure:first-child { grid-column: 1 / -1; border-bottom-left-radius: 56px; }
+  .photos.two figure:nth-child(2) { grid-column: 1 / -1; aspect-ratio: 16 / 9; }
+}
