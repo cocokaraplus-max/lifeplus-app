@@ -1076,3 +1076,14 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
 @media (max-width: 760px) {
   .site-foot::after { width: 340px; height: 340px; right: -120px; top: 50%; margin-top: -170px; opacity: .09; }
 }
+
+/* ---------- ポラロイドはどれを触っても動く（lifeplus-polaroid-hover-v1）---------- */
+.photos-band .photos.polaroid figure { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.photos-band .photos.polaroid figure:hover, .photos-band .photos.polaroid figure:active, .photos-band .photos.polaroid figure:focus-visible {
+  transform: rotate(0deg) translateY(-6px) scale(1.04); z-index: 9; }
+@media (prefers-reduced-motion: reduce) {
+  .photos-band .photos.polaroid figure:hover, .photos-band .photos.polaroid figure:active { transform: none; }
+}
+
+/* ---------- 郵便番号を住所の上に（lifeplus-zip-v1）---------- */
+.addr .zip { display: block; font-size: 15px; font-weight: 500; letter-spacing: .06em; color: var(--sub); line-height: 1.4; margin-bottom: 2px; }
