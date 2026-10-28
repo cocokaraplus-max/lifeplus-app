@@ -1126,7 +1126,7 @@
   var PHOTO_DEFAULT = {
     top_hero: "day-bench.jpg", top_day: "day-outing.jpg" /* lifeplus-top-hero-v3 */, top_kotsu: "spine.jpg", top_body: "studio.jpg",
     day_1: "day-flower.jpg", day_2: "day-training.jpg", kotsu_1: "care.jpg", kotsu_2: "spine.jpg",
-    body_1: "studio.jpg", body_2: "wreath.jpg", body_3: "body-towel.jpg", profile: "hiro.jpg",
+    body_1: "body-towel.jpg", body_2: "body-hands.jpg", body_3: "studio.jpg", profile: "hiro.jpg",
   };
   function label(list, k) { var x = list.filter(function (p) { return p[0] === k; })[0]; return x ? x[1] : ""; }
   function opts(list, cur) { return list.map(function (p) { return '<option value="' + p[0] + '"' + (p[0] === cur ? " selected" : "") + ">" + esc(p[1]) + "</option>"; }).join(""); }
