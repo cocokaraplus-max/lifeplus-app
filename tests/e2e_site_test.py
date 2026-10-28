@@ -38,7 +38,7 @@ with sync_playwright() as p:
         pg.on("pageerror", lambda e: errors.append(str(e)))
         pg.goto(BASE + "/"); pg.wait_for_timeout(1500)
         pg.screenshot(path=f"{SHOTS}/site_top_{tag}.png", full_page=True)
-        check(f"[{tag}] トップ：見出し", pg.inner_text("h1").replace("\n", "") == "からだと、くらしに、プラスを。")
+        check(f"[{tag}] トップ：見出し", pg.inner_text("h1").replace("\n", "") == "ココロと、カラダに、プラスを。")  # lifeplus-catch-v1
         check(f"[{tag}] トップ：3つの事業が各ページへ", [pg.get_attribute(f".svc:nth-of-type({i})", "href") for i in (1, 2, 3)] == ["dayservice/", "sekkotsu/", "bodycare/"])
         check(f"[{tag}] 横にはみ出さない", pg.evaluate("document.documentElement.scrollWidth <= innerWidth + 1"))
         if tag == "sp":
