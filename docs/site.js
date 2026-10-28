@@ -236,3 +236,9 @@
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (d) { if (d) render(d); }, function () { /* 読めなければ元のまま */ });
 })();
+
+/* ---------- コピーライトの年を今年にそろえる（lifeplus-copyright-v1） ---------- */
+(function () {
+  var y = String(new Date().getFullYear());
+  Array.prototype.forEach.call(document.querySelectorAll("[data-year]"), function (el) { if (y >= "2026") el.textContent = y; });
+})();
