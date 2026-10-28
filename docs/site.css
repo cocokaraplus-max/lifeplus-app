@@ -957,3 +957,6 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   .photos.polaroid figure, .photos.polaroid figure + figure { padding: 4px 4px 17px; }
   .photos.polaroid figure::after { font-size: 8px; bottom: 4px; letter-spacing: .02em; }
 }
+
+/* ---------- 季節の行事の写真を正方形に（lifeplus-season-square-v1）---------- */
+.season-ph figure:first-child, .season-ph.empty { aspect-ratio: 1; }
