@@ -681,3 +681,36 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   .profile.has-portrait h3, .profile.has-portrait p.muted, .profile.has-portrait .career { grid-column: 1 / -1; }
   .profile.has-portrait h3 { margin-top: 4px; }
 }
+
+/* ---------- デイの写真の位置・季節の行事（lifeplus-day-seasons-v1）---------- */
+.photos img.pos-top { object-position: 50% 30%; }
+.seasons { --sp: #e8869c; --sp-s: #fdeef1; --su: #2f9fd0; --su-s: #e7f5fb; --au: var(--orange); --au-s: var(--orange-soft); --wi: #3f8f5a; --wi-s: #e9f5ec; }
+.season-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(14px, 2vw, 24px); }
+.season { --k: var(--orange); --ks: var(--orange-soft); background: #fff; border: 1px solid var(--line); border-radius: 24px; overflow: hidden;
+  display: flex; flex-direction: column; box-shadow: 0 16px 34px -28px rgba(35,38,43,.45); }
+.season.s-spring { --k: var(--sp); --ks: var(--sp-s); }
+.season.s-summer { --k: var(--su); --ks: var(--su-s); }
+.season.s-autumn { --k: var(--au); --ks: var(--au-s); }
+.season.s-winter { --k: var(--wi); --ks: var(--wi-s); }
+.season-ph { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; background: var(--ks); }
+.season-ph figure { margin: 0; overflow: hidden; aspect-ratio: 1; grid-column: span 1; }
+.season-ph figure:first-child { grid-column: 1 / -1; aspect-ratio: 4 / 3; }
+.season-ph img { width: 100%; height: 100%; object-fit: cover; transition: transform .6s ease; }
+.season:hover .season-ph img { transform: scale(1.04); }
+.season-ph.empty { display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; aspect-ratio: 4 / 3;
+  background: radial-gradient(90% 90% at 30% 20%, #fff 0%, var(--ks) 70%); }
+.season-ph.empty span { font-family: var(--head); font-weight: 900; font-size: clamp(64px, 7vw, 96px); line-height: 1; color: var(--k); opacity: .35; }
+.season-tx { padding: 18px 20px 22px; position: relative; }
+.season-k { position: absolute; top: -22px; left: 18px; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--k); color: #fff; font-family: var(--head); font-weight: 900; font-size: 20px; box-shadow: 0 0 0 4px #fff; }
+.season-tx h3 { font-size: 21px; margin: 16px 0 6px; color: var(--ink); }
+.season-tx p { font-size: 15px; line-height: 1.8; color: var(--sub); margin: 0; }
+@media (max-width: 1000px) { .season-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 420px) {
+  .season-grid { gap: 10px; }
+  .season { border-radius: 18px; }
+  .season-tx { padding: 14px 12px 16px; }
+  .season-k { width: 36px; height: 36px; font-size: 16px; top: -18px; left: 12px; }
+  .season-tx h3 { font-size: 17px; margin-top: 12px; }
+  .season-tx p { font-size: 13px; line-height: 1.7; }
+}

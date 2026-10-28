@@ -1124,8 +1124,8 @@
   var NEWS_BIZ = [["all", "すべてのページ"], ["day", "デイサービス"], ["sekkotsu", "接骨院"], ["bodycare", "ボディケア"]];
   var JOB_BIZ = [["day", "デイサービス"], ["sekkotsu", "接骨院"], ["bodycare", "ボディケア"], ["company", "会社全体"]];
   var PHOTO_DEFAULT = {
-    top_hero: "day-outing.jpg", top_day: "day-origami.jpg", top_kotsu: "spine.jpg", top_body: "studio.jpg",
-    day_1: "day-origami.jpg", day_2: "building.jpg", kotsu_1: "care.jpg", kotsu_2: "spine.jpg",
+    top_hero: "day-outing.jpg", top_day: "day-bench.jpg", top_kotsu: "spine.jpg", top_body: "studio.jpg",
+    day_1: "day-flower.jpg", day_2: "building.jpg", kotsu_1: "care.jpg", kotsu_2: "spine.jpg",
     body_1: "studio.jpg", body_2: "wreath.jpg", body_3: "plant.jpg", profile: "hiro.jpg",
   };
   function label(list, k) { var x = list.filter(function (p) { return p[0] === k; })[0]; return x ? x[1] : ""; }
