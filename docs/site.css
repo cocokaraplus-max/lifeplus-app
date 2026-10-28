@@ -899,3 +899,29 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   .photos.polaroid figure::after { font-size: 10px; bottom: 7px; letter-spacing: .1em; }
 }
 @media (prefers-reduced-motion: reduce) { .photos.polaroid figure { transition: none; } }
+
+/* ---------- ポラロイドの下地をウッド調の壁に（lifeplus-polaroid-wood-v1）----------
+   縦の板張り：板の継ぎ目・板ごとの色むら・細い木目を、グラデーションの重ねで描く */
+.photos-band:has(.photos.polaroid) {
+  padding: clamp(34px, 5vw, 56px) 0 clamp(14px, 2vw, 24px);
+  background-color: #c9a27a;
+  background-image:
+    linear-gradient(180deg, rgba(255,255,255,.10), rgba(0,0,0,.10)),
+    repeating-linear-gradient(90deg, rgba(60,35,15,.30) 0 2px, rgba(255,255,255,.18) 2px 3px, transparent 3px 118px),
+    repeating-linear-gradient(90deg, transparent 0 9px, rgba(90,55,25,.07) 9px 11px, transparent 11px 23px, rgba(255,240,220,.06) 23px 26px, transparent 26px 41px),
+    repeating-linear-gradient(90deg, transparent 0 37px, rgba(80,45,20,.10) 37px 38px, transparent 38px 61px, rgba(80,45,20,.06) 61px 63px, transparent 63px 97px, rgba(255,235,210,.08) 97px 99px, transparent 99px 118px),
+    radial-gradient(ellipse 14px 60px at 30% 40%, rgba(90,55,25,.16), transparent 70%),
+    radial-gradient(ellipse 10px 44px at 72% 70%, rgba(90,55,25,.13), transparent 70%),
+    repeating-linear-gradient(90deg, #d1a97f 0 118px, #c19669 118px 236px, #d8b38b 236px 354px, #bb8f63 354px 472px, #cca47a 472px 590px, #c49b70 590px 708px, #d3ad84 708px 826px);
+  box-shadow: inset 0 10px 18px -12px rgba(40,25,10,.45), inset 0 -10px 18px -12px rgba(40,25,10,.35);
+}
+.photos.polaroid { justify-content: center; }
+.photos.polaroid figure { box-shadow: 0 20px 30px -16px rgba(40,25,10,.55), 0 2px 4px rgba(40,25,10,.15); }
+.photos.polaroid figure::before { content: ""; position: absolute; top: -9px; left: 50%; width: 74px; height: 20px; margin-left: -37px; z-index: 2;
+  background: rgba(241,238,246,.78); box-shadow: 0 1px 2px rgba(0,0,0,.12); transform: rotate(-3deg); }
+.photos.polaroid figure:nth-child(2)::before { transform: rotate(4deg); }
+.photos.polaroid figure:nth-child(3)::before { transform: rotate(-1deg); width: 60px; margin-left: -30px; }
+@media (max-width: 560px) {
+  .photos.polaroid figure::before { top: -6px; width: 44px; height: 13px; margin-left: -22px; }
+  .photos.polaroid figure:nth-child(3)::before { width: 38px; margin-left: -19px; }
+}
