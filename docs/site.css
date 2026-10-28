@@ -771,3 +771,10 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   .oneday-item figure { flex: 0 0 92px; width: 92px; height: 92px; margin: 12px 0 12px 12px; border-radius: 12px; }
   .oneday-item > div { padding: 12px 14px; }
 }
+
+/* ---------- 機能訓練の写真を1日型と同じ大きさに（lifeplus-feat-photo-v1）---------- */
+.feature > div > .feat-ph { width: 160px; height: 160px; max-width: none; aspect-ratio: auto; border-radius: 16px; margin: 4px 0 0; }
+.feat-ph img { object-position: 50% 35%; }
+@media (max-width: 760px) {
+  .feature > div > .feat-ph { width: 92px; height: 92px; border-radius: 12px; }
+}
