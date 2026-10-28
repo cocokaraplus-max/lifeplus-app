@@ -878,3 +878,24 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
 .reason-list > li { grid-template-columns: clamp(76px, 9vw, 124px) minmax(0, 1fr); }
 .reason-list .rn { font-variant-numeric: tabular-nums; }
 @media (max-width: 560px) { .reason-list > li { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- ボディケアの入ってすぐの3枚：ポラロイド風（lifeplus-body-polaroid-v1）---------- */
+.photos-band:has(.photos.polaroid) { overflow-x: clip; }
+.photos.polaroid { display: flex; justify-content: flex-start; gap: 0; padding-top: 24px; padding-bottom: 44px; }
+.photos.polaroid figure, .photos.polaroid figure + figure { width: 210px; flex: none; aspect-ratio: auto; background: #fff; padding: 10px 10px 38px;
+  border-radius: 4px; overflow: visible; position: relative; grid-column: auto; box-shadow: 0 18px 34px -20px rgba(62,50,86,.55);
+  transition: transform .35s ease; }
+.photos.polaroid figure:first-child { border-radius: 4px; }
+.photos.polaroid figure img { aspect-ratio: 1; height: auto; border-radius: 2px; }
+.photos.polaroid figure:nth-child(1) { transform: rotate(-5deg); z-index: 1; }
+.photos.polaroid figure:nth-child(2) { transform: rotate(3deg) translateY(18px); margin-left: -14px; z-index: 2; }
+.photos.polaroid figure:nth-child(3) { transform: rotate(-2deg) translateY(-4px); margin-left: -14px; z-index: 3; }
+.photos.polaroid figure:hover { transform: rotate(0deg) translateY(-6px) scale(1.03); z-index: 4; }
+.photos.polaroid figure::after { content: attr(data-cap); position: absolute; left: 0; right: 0; bottom: 10px; text-align: center;
+  font-family: var(--en); font-size: 13px; letter-spacing: .14em; color: var(--plum-ink); }
+@media (max-width: 560px) {
+  .photos.polaroid { padding-top: 16px; padding-bottom: 34px; }
+  .photos.polaroid figure, .photos.polaroid figure + figure { width: 36%; padding: 6px 6px 26px; }
+  .photos.polaroid figure::after { font-size: 10px; bottom: 7px; letter-spacing: .1em; }
+}
+@media (prefers-reduced-motion: reduce) { .photos.polaroid figure { transition: none; } }
