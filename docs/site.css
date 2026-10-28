@@ -471,3 +471,52 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
 .insta a span { font-size: 13px; color: var(--sub); }
 .insta a:hover { outline: 2px solid var(--c); }
 @media (max-width: 560px) { .insta a { flex: 1 1 100%; } }
+
+/* ---------- タスカルくん（lifeplus-tasukarukun-v1）---------- */
+.app-card.ph-card { display: block; position: relative; overflow: hidden; margin: 0; padding: 0; background: #1b3653; }
+.app-card.ph-card img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 40%; }
+.app-card.ph-card figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 40px 24px 18px 96px; text-align: right;
+  background: linear-gradient(to top, rgba(15, 30, 48, .82), rgba(15, 30, 48, 0)); color: #fff; }
+.app-card.ph-card figcaption .en { display: inline; margin: 0 12px 0 0; font-size: clamp(22px, 2.4vw, 30px); font-weight: 400; letter-spacing: .06em; color: #fff; }
+.app-card.ph-card figcaption b { font-family: var(--head); font-size: 16px; letter-spacing: .2em; }
+.tsk-note { margin: 14px 0 0; color: var(--sub); font-size: 15px; }
+.tsk-note b { color: var(--ci); }
+.fig.poster img { max-width: 440px; border-radius: 24px; box-shadow: 0 16px 40px rgba(31, 63, 96, .18); }
+/* アメコミ風のキャラクター紹介 */
+.comic { position: relative; overflow: hidden; background-color: #ffd23f;
+  background-image: radial-gradient(rgba(0, 0, 0, .16) 1.6px, transparent 1.7px); background-size: 14px 14px;
+  border-top: 6px solid #111; border-bottom: 6px solid #111; }
+.comic-in { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); grid-template-areas: "p1 text" "pv p2"; gap: 28px 44px; align-items: start; }
+.comic-panel { position: relative; margin: 0; border: 6px solid #111; background: #fff; box-shadow: 10px 10px 0 #111; overflow: visible; }
+.comic-panel img { display: block; width: 100%; height: auto; }
+.comic-panel.p1 { grid-area: p1; transform: rotate(-2deg); align-self: start; margin-top: 56px; }
+.comic-panel.p2 { grid-area: p2; transform: rotate(2.5deg); width: 78%; justify-self: end; }
+.comic-text { grid-area: text; }
+.comic-panel.pv { grid-area: pv; transform: rotate(1.5deg); align-self: start; }
+.comic-panel video { display: block; width: 100%; height: auto; background: #0b3fb8; }
+.sfx.s3 { right: -20px; bottom: -22px; transform: rotate(10deg); }
+.comic-kicker { display: inline-block; margin: 0 0 10px; padding: 4px 14px; background: #111; color: #ffd23f;
+  font-family: "Bangers", var(--en); font-size: 22px; letter-spacing: .08em; transform: rotate(-3deg); }
+.comic-name { margin: 0 0 18px; line-height: 1; }
+.comic-name .en { display: block; font-family: "Bangers", var(--en); font-weight: 400; font-size: clamp(44px, 5.6vw, 78px); letter-spacing: .03em; white-space: nowrap;
+  color: #e8312a; -webkit-text-stroke: 3px #111; paint-order: stroke fill; text-shadow: 6px 6px 0 #111; transform: skew(-6deg) rotate(-3deg); transform-origin: left; }
+.comic-name .jp { display: inline-block; margin-top: 14px; font-family: "Dela Gothic One", var(--head); font-weight: 400; font-size: clamp(26px, 3vw, 38px);
+  color: #fff; -webkit-text-stroke: 2px #111; paint-order: stroke fill; text-shadow: 4px 4px 0 #111; letter-spacing: .06em; }
+.bubble { position: relative; display: inline-block; margin: 6px 0 24px; padding: 14px 22px; background: #fff; border: 4px solid #111; border-radius: 26px;
+  font-family: "Dela Gothic One", var(--head); font-size: clamp(17px, 1.8vw, 22px); color: #111; box-shadow: 5px 5px 0 #111; }
+.bubble::after { content: ""; position: absolute; left: 34px; bottom: -22px; width: 26px; height: 22px; background: #fff;
+  border-left: 4px solid #111; border-bottom: 4px solid #111; transform: skewX(-35deg); }
+.comic-prof { display: grid; grid-template-columns: max-content minmax(0, 1fr); margin: 0; background: #fff; border: 4px solid #111; box-shadow: 6px 6px 0 #111; }
+.comic-prof dt, .comic-prof dd { margin: 0; padding: 10px 14px; border-bottom: 2px solid #111; }
+.comic-prof dt { background: #e8312a; color: #fff; font-weight: 700; border-right: 2px solid #111; }
+.comic-prof dt:last-of-type, .comic-prof dd:last-of-type { border-bottom: 0; }
+.sfx { position: absolute; z-index: 2; padding: 16px 26px; font-family: "Bangers", var(--en); font-size: clamp(26px, 3vw, 40px); letter-spacing: .04em;
+  color: #ffd23f; -webkit-text-stroke: 2px #111; paint-order: stroke fill; text-shadow: 3px 3px 0 #111; background: #e8312a;
+  clip-path: polygon(0 18%, 14% 22%, 10% 0, 30% 14%, 46% 0, 56% 16%, 76% 2%, 76% 22%, 100% 20%, 86% 42%, 100% 60%, 82% 66%, 92% 92%, 66% 80%, 52% 100%, 42% 80%, 18% 96%, 20% 72%, 0 70%, 12% 46%); }
+.sfx.s1 { right: -18px; top: -26px; transform: rotate(8deg); }
+.sfx.s2 { left: -22px; bottom: -24px; transform: rotate(-8deg); }
+@media (max-width: 860px) {
+  .comic-in { grid-template-columns: 1fr; grid-template-areas: "p1" "text" "pv" "p2"; gap: 34px; }
+  .comic-panel.p2 { width: 86%; }
+  .comic-panel { border-width: 5px; box-shadow: 7px 7px 0 #111; }
+}
