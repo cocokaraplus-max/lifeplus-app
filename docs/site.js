@@ -31,10 +31,19 @@
   // ---------- スマホのメニュー ----------
   var mb = document.querySelector(".menu-btn"), nav = document.querySelector(".nav");
   if (mb && nav) {
-    mb.addEventListener("click", function () {
-      var open = nav.classList.toggle("open");
+    // lifeplus-nav-v1：丸いハンバーガー。行き先を押す・Esc で閉じる
+    var setMenu = function (open) {
+      nav.classList.toggle("open", open);
+      mb.classList.toggle("on", open);
       mb.setAttribute("aria-expanded", open ? "true" : "false");
-      mb.textContent = open ? "閉じる" : "メニュー";
+      mb.setAttribute("aria-label", open ? "メニューを閉じる" : "メニューを開く");
+      var lb = mb.querySelector(".mb-lb");
+      if (lb) lb.textContent = open ? "CLOSE" : "MENU";
+    };
+    mb.addEventListener("click", function () { setMenu(!nav.classList.contains("open")); });
+    nav.addEventListener("click", function (e) { if (e.target.closest && e.target.closest("a")) setMenu(false); });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && nav.classList.contains("open")) { setMenu(false); mb.focus(); }
     });
   }
 
