@@ -1,4 +1,4 @@
-/* LIFE PLUS ホームページ  marker: lifeplus-site-v1 / lifeplus-site-v2 / site-contact-v1 */
+/* LIFE PLUS ホームページ  marker: lifeplus-site-v1 / lifeplus-site-v2 / site-contact-v1 / lifeplus-site-cms-v1 */
 (function () {
   "use strict";
 
@@ -59,7 +59,7 @@
       var f = form.elements;
       var body = {
         action: "contact", business: form.getAttribute("data-business") || "other",
-        kind: f.kind.value, name: f.name.value, org: f.org ? f.org.value : "",
+        kind: f.kind ? f.kind.value : "", jobId: f.jobId ? f.jobId.value : "", name: f.name.value, org: f.org ? f.org.value : "",
         phone: f.phone.value, email: f.email.value, body: f.body.value,
         website: f.website.value, elapsed: Date.now() - opened
       };
@@ -82,4 +82,148 @@
         .then(function () { btn.disabled = false; btn.textContent = "この内容で送る"; });
     });
   }
+})();
+
+/* ---------- ホームページの変えられる所（lifeplus-site-cms-v1） ----------
+   管理画面で変えた「お知らせ・求人・デイの利用時間・受付時間・ボディケアの料金・写真」を、関所から読んで差し替える。
+   読めなかったときは、ページに書いてある元の中身のまま。 */
+(function () {
+  "use strict";
+  var cfg = window.LP_CONFIG || {};
+  var WD = ["", "月", "火", "水", "木", "金", "土", "日"];
+  var BIZ = { all: "", day: "デイサービス", sekkotsu: "接骨院", bodycare: "ボディケア", company: "会社" };
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function br(s) { return esc(s).replace(/\n/g, "<br>"); }
+  function each(sel, fn) { Array.prototype.forEach.call(document.querySelectorAll(sel), fn); }
+  function md(ymd) { var p = ymd.split("-"); return Number(p[0]) + "." + Number(p[1]) + "." + Number(p[2]); }
+  function yen(n) { return "¥" + Number(n).toLocaleString("ja-JP"); }
+
+  // メールアドレスは、機械に読み取られにくいよう画面でだけ組み立てる
+  each("[data-mail]", function (a) {
+    var m = a.getAttribute("data-mail") + "@" + a.getAttribute("data-dom");
+    a.href = "mailto:" + m; a.textContent = m;
+  });
+
+  // 受付時間：同じ時間の曜日をまとめる（例：月曜・木曜 17:00〜20:00）
+  function groupHours(list) {
+    var by = {};
+    list.forEach(function (h) { (by[h.weekday] = by[h.weekday] || []).push(h.open + "〜" + h.close); });
+    var groups = [];
+    Object.keys(by).map(Number).sort(function (a, b) { return a - b; }).forEach(function (w) {
+      var t = by[w].join("・");
+      var g = groups.filter(function (x) { return x.t === t; })[0];
+      if (g) g.w.push(w); else groups.push({ t: t, w: [w] });
+    });
+    return groups;
+  }
+
+  function render(d) {
+    // 写真
+    var ph = d.photos || {};
+    each("img[data-photo]", function (img) {
+      var u = ph[img.getAttribute("data-photo")];
+      if (u && /^https:\/\//.test(u)) { img.src = u; img.removeAttribute("srcset"); }
+    });
+    // デイの利用時間
+    if (d.dayHours) {
+      each("[data-cms]", function (el) {
+        var k = el.getAttribute("data-cms"), v = { day_am: d.dayHours.am, day_pm: d.dayHours.pm, day_sun: d.dayHours.sun, day_days: d.dayHours.days }[k];
+        if (v == null) return;
+        if (!v) { el.hidden = true; return; }
+        el.textContent = (el.getAttribute("data-prefix") || "") + v;
+      });
+    }
+    // 接骨院・ボディケアの受付時間（予約の設定と同じもの）
+    if (d.rsvHours && d.rsvHours.length) {
+      var g = groupHours(d.rsvHours);
+      // 帯の中の「曜日と時間」のマスを、今の受付時間で作り直す
+      var cells = document.querySelectorAll("[data-rsv-cell]");
+      if (cells.length) {
+        var parent = cells[0].parentNode, first = cells[0];
+        g.forEach(function (x) {
+          var dv = document.createElement("div");
+          dv.setAttribute("data-rsv-cell", "");
+          dv.innerHTML = "<b>" + x.w.map(function (w) { return WD[w] + "曜"; }).join("・") + "</b><span>" + esc(x.t) + "</span>";
+          parent.insertBefore(dv, first);
+        });
+        Array.prototype.forEach.call(cells, function (c) { c.parentNode.removeChild(c); });
+      }
+      each("[data-rsv-hours=text]", function (el) {
+        el.textContent = g.map(function (x) { return x.w.map(function (w) { return WD[w]; }).join("・") + " " + x.t; }).join("／");
+      });
+    }
+    // ボディケアのメニュー
+    if (d.menus && d.menus.length) {
+      each("[data-menus]", function (box) {
+        box.innerHTML = d.menus.map(function (m) {
+          return '<div class="menu-item' + (m.featured ? " main" : "") + '"><h3>' + esc(m.name) + "<small>" + esc(m.durationMin) + " min</small></h3>" +
+            '<span class="price">' + (m.priceYen == null ? "" : yen(m.priceYen)) + "</span>" + (m.description ? "<p>" + esc(m.description) + "</p>" : "") + "</div>";
+        }).join("");
+      });
+    }
+    // お知らせ
+    each("[data-news]", function (sec) {
+      var want = sec.getAttribute("data-news"), max = Number(sec.getAttribute("data-max") || 5);
+      var list = (d.news || []).filter(function (n) { return want === "all" || n.business === "all" || n.business === want; }).slice(0, max);
+      var box = sec.querySelector(".news-list");
+      if (!list.length || !box) { sec.hidden = true; return; }
+      box.innerHTML = list.map(function (n) {
+        return '<li><time datetime="' + esc(n.date) + '">' + esc(md(n.date)) + "</time>" +
+          (n.business !== "all" && want === "all" ? '<span class="nb nb-' + esc(n.business) + '">' + esc(BIZ[n.business]) + "</span>" : "") +
+          (n.body ? "<details><summary>" + esc(n.title) + "</summary><p>" + br(n.body) + "</p></details>" : "<span class=\"nt\">" + esc(n.title) + "</span>") + "</li>";
+      }).join("");
+      sec.hidden = false;
+    });
+    // 求人（採用ページ）
+    each("[data-jobs]", function (box) {
+      var jobs = d.jobs || [];
+      var none = document.querySelector("[data-jobs-none]");
+      if (none) none.hidden = jobs.length > 0;
+      var bizs = []; jobs.forEach(function (j) { if (bizs.indexOf(j.business) < 0) bizs.push(j.business); });
+      var chips = document.querySelector("[data-job-chips]");
+      if (chips) {
+        chips.hidden = bizs.length < 2;
+        chips.innerHTML = ['<button type="button" data-jf="" aria-pressed="true">すべて</button>'].concat(bizs.map(function (b) {
+          return '<button type="button" data-jf="' + esc(b) + '" aria-pressed="false">' + esc(BIZ[b]) + "</button>";
+        })).join("");
+        Array.prototype.forEach.call(chips.querySelectorAll("[data-jf]"), function (c) {
+          c.onclick = function () {
+            var f = c.getAttribute("data-jf");
+            Array.prototype.forEach.call(chips.querySelectorAll("[data-jf]"), function (x) { x.setAttribute("aria-pressed", String(x === c)); });
+            Array.prototype.forEach.call(box.querySelectorAll(".job"), function (el) { el.hidden = !!f && el.getAttribute("data-biz") !== f; });
+          };
+        });
+      }
+      var rows = [["仕事の内容", "duties"], ["応募の条件", "requirements"], ["給与", "salary"], ["勤務時間", "hours"], ["休日", "holidays"], ["待遇・手当", "benefits"]];
+      box.innerHTML = jobs.map(function (j) {
+        return '<article class="job c-' + esc(j.business === "sekkotsu" ? "kotsu" : j.business === "bodycare" ? "body" : j.business === "company" ? "app" : "day") + '" data-biz="' + esc(j.business) + '">' +
+          '<div class="job-head"><span class="job-biz">' + esc(BIZ[j.business]) + '</span><span class="job-emp">' + esc(j.employment) + "</span></div>" +
+          "<h3>" + esc(j.title) + "</h3>" + (j.summary ? '<p class="job-sum">' + br(j.summary) + "</p>" : "") +
+          '<dl class="facts">' + rows.filter(function (r) { return j[r[1]]; }).map(function (r) { return "<dt>" + r[0] + "</dt><dd>" + br(j[r[1]]) + "</dd>"; }).join("") + "</dl>" +
+          '<a class="btn solid" href="#apply" data-apply="' + esc(j.id) + '">この求人に応募する</a></article>';
+      }).join("");
+      var sel = document.querySelector("#contact select[name=jobId]");
+      if (sel) {
+        sel.innerHTML = jobs.map(function (j) { return '<option value="' + esc(j.id) + '">' + esc(BIZ[j.business] + "／" + j.title + "（" + j.employment + "）") + "</option>"; }).join("") +
+          '<option value="">求人全般・そのほかの相談</option>';
+        Array.prototype.forEach.call(box.querySelectorAll("[data-apply]"), function (a) {
+          a.addEventListener("click", function () { sel.value = a.getAttribute("data-apply"); });
+        });
+      }
+    });
+    each("[data-job-count]", function (el) {
+      var n = (d.jobs || []).length;
+      el.textContent = n ? "いま " + n + " 件の募集があります" : "";
+      el.hidden = !n;
+    });
+  }
+
+  if (!cfg.API_URL) return;
+  fetch(cfg.API_URL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "site" }) })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) { if (d) render(d); }, function () { /* 読めなければ元のまま */ });
 })();

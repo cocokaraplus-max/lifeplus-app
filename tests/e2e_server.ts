@@ -7,12 +7,14 @@ const verifyIdToken = (t: string) =>
   Promise.resolve(t.startsWith("tok-") ? { sub: "U" + t.slice(4), name: "LINE太郎" } : null);
 const NOW = new Date("2026-10-16T12:00:00+09:00");
 const root = new URL("../docs/", import.meta.url);
+// lifeplus-site-cms-v1: 写真は置かずに、置いたことにして URL だけ返す
+const putImage = (path: string) => Promise.resolve(`https://img.test/site/${path}`);
 
 Deno.serve({ port: 8765 }, async (req) => {
   const u = new URL(req.url);
   if (u.pathname === "/api") {
     try {
-      return Response.json(await handle(await req.json(), { sql, verifyIdToken, now: () => NOW }));
+      return Response.json(await handle(await req.json(), { sql, verifyIdToken, now: () => NOW, putImage }));   // lifeplus-site-cms-v1
     } catch (e) {
       if (e instanceof ApiError) return Response.json({ error: e.code }, { status: e.status });
       console.error(e);
@@ -29,7 +31,7 @@ Deno.serve({ port: 8765 }, async (req) => {
   try {
     const body = await Deno.readFile(new URL(path, root));
     const type = path.endsWith(".js") ? "text/javascript; charset=utf-8" : path.endsWith(".css") ? "text/css; charset=utf-8"
-      : path.endsWith(".svg") ? "image/svg+xml" : path.endsWith(".png") ? "image/png" : "text/html; charset=utf-8";
+      : path.endsWith(".svg") ? "image/svg+xml" : path.endsWith(".png") ? "image/png" : path.endsWith(".jpg") ? "image/jpeg" : path.endsWith(".mp4") ? "video/mp4" : "text/html; charset=utf-8";
     return new Response(body, { headers: { "content-type": type } });
   } catch {
     return new Response("not found", { status: 404 });

@@ -15,14 +15,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Outfit:wght@300;400;500&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap">
-  <link rel="stylesheet" href="../site.css?v=20261028d">
+  <link rel="stylesheet" href="../site.css?v=20261028h">
 </head>
 <body class="c-app">
 <header class="site-top">
   <div class="wrap">
     <a class="logo" href="../" aria-label="LIFE PLUS トップへ"><img class="mk" src="../img/mark.svg" alt="" width="34" height="34"><img class="wm" src="../img/wordmark.png" alt="LIFE PLUS" width="117" height="18"></a>
     <button class="menu-btn" type="button" aria-expanded="false" aria-controls="nav">メニュー</button>
-    <nav class="nav" id="nav" aria-label="ページの案内"><a href="../dayservice/">デイサービス</a><a href="../sekkotsu/">接骨院</a><a href="../bodycare/">ボディケア</a><a href="../apps/">アプリ開発</a><a href="../#access">アクセス</a><a class="rsv" href="https://liff.line.me/2012042545-nlHLpIre/yoyaku/">LINEで予約</a></nav>
+    <nav class="nav" id="nav" aria-label="ページの案内"><a href="../dayservice/">デイサービス</a><a href="../sekkotsu/">接骨院</a><a href="../bodycare/">ボディケア</a><a href="../apps/">アプリ開発</a><a href="../recruit/">採用情報</a><a href="../#access">アクセス</a><a class="rsv" href="https://liff.line.me/2012042545-nlHLpIre/yoyaku/">LINEで予約</a></nav>
     <div class="size" role="group" aria-label="文字の大きさ">
       <span class="size-lb">文字</span>
       <button type="button" data-size="1" aria-pressed="true">標準</button>
@@ -47,6 +47,7 @@
     <ul>
       <li><b>LINEでのご予約</b>：お名前・フリガナ・お電話番号、LINEの表示名とLINEのユーザーを見分ける番号、ご予約の内容（日時・メニュー・選んでいただいた症状）、ご来院の記録</li>
       <li><b>お問い合わせフォーム</b>：お名前・事業所名・お電話番号・メールアドレス・ご相談の内容</li>
+      <li><b>採用への応募</b>：お名前・お電話番号・メールアドレス・応募の内容（ご経験・資格・ご希望など）</li>
       <li><b>メール・お電話・FAX</b>：お知らせいただいた内容</li>
     </ul>
 
@@ -54,6 +55,7 @@
     <ul>
       <li>ご予約の受付・確認・変更のご連絡と、施術のため</li>
       <li>お問い合わせへのお返事のため</li>
+      <li>採用の選考と、応募された方へのご連絡のため</li>
       <li>予約の取り消しやご来院がなかったことの記録など、予約を正しく運営するため</li>
       <li>サービスを良くするため（個人が分からない形にまとめて使います）</li>
     </ul>
@@ -66,7 +68,7 @@
     <p>当社は、次のサービスを使って情報を扱っています。各社のプライバシーポリシーもご確認ください。</p>
     <ul>
       <li>LINE（LINEヤフー株式会社）：ご予約の受付とご連絡</li>
-      <li>Supabase：ご予約・お問い合わせの記録の保存</li>
+      <li>Supabase：ご予約・お問い合わせ・ご応募の記録の保存</li>
       <li>GitHub Pages：このホームページの公開</li>
       <li>Google（Googleマップ・Google Fonts）：地図と文字の表示。表示のために、お使いの端末の情報（IPアドレスなど）がGoogleに送られることがあります</li>
     </ul>
@@ -84,7 +86,7 @@
     <dl class="facts">
       <dt>事業者</dt><dd>合同会社LIFE PLUS　代表 岸本 洋幸</dd>
       <dt>所在地</dt><dd>〒471-0832 愛知県豊田市丸山町7丁目49番地6</dd>
-      <dt>メール</dt><dd><a href="mailto:hiro@lifeplusllc.com">hiro@lifeplusllc.com</a></dd>
+      <dt>メール</dt><dd><a data-mail="hiro" data-dom="lifeplusllc.com" href="../apps/#inquiry">お問い合わせフォーム</a></dd>
       <dt>お電話</dt><dd>0565-41-7804（デイサービス ココカラプラス）</dd>
     </dl>
 
@@ -98,11 +100,12 @@
 <footer class="site-foot zoom">
   <div class="wrap">
     <div><img class="wm" src="../img/wordmark-w.png" alt="LIFE PLUS" width="143" height="22"><p>合同会社LIFE PLUS</p><p>〒471-0832<br>愛知県豊田市丸山町<br>7丁目49番地6</p></div>
-    <div><h4>Services</h4><p><a href="../dayservice/">機能訓練型デイサービス ココカラプラス</a></p><p><a href="../sekkotsu/">もみの木接骨院</a></p><p><a href="../bodycare/">HIROボディケアスタジオ</a></p><p><a href="../apps/">アプリ開発（TASUKARU）</a></p></div>
+    <div><h4>Services</h4><p><a href="../dayservice/">機能訓練型デイサービス ココカラプラス</a></p><p><a href="../sekkotsu/">もみの木接骨院</a></p><p><a href="../bodycare/">HIROボディケアスタジオ</a></p><p><a href="../apps/">アプリ開発（TASUKARU）</a></p><p><a href="../recruit/">採用情報</a></p></div>
     <div><h4>Contact</h4><p><a href="https://liff.line.me/2012042545-nlHLpIre/yoyaku/">接骨院・ボディケアのご予約（LINE）</a></p><p>デイサービス　<a href="tel:0565417804">0565-41-7804</a></p><p>FAX　0565-41-7814</p></div>
     <p class="copy"><a href="../privacy/">プライバシーポリシー</a><span>© LIFE PLUS LLC.</span></p>
   </div>
 </footer>
-<script src="../site.js?v=20261023f"></script>
+<script src="../config.js?v=20261023f"></script>
+<script src="../site.js?v=20261028h"></script>
 </body>
 </html>

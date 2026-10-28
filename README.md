@@ -73,3 +73,20 @@ deno run -A tests/e2e_server.ts & python3 tests/e2e_test.py      # 画面 11項�
 - 番号の入れ間違いは同じ所から1時間に10回・全体で50回まで
 - 表：`sql/lifeplus_devices_v1.sql`（admin_devices・device_pair_fails。番号も合鍵もハッシュだけ）
 - 確かめ：`tests/device_test.ts`（関所 12項目）・`tests/e2e_device_test.py`（画面 11項目）
+
+## 2026-10-28 ホームページを管理画面から変える・採用ページ（marker: lifeplus-site-cms-v1 / lifeplus-insta-v2）
+- 管理画面に「HP」タブ（権限 `site`。HIROさん・権限を渡したスタッフ・お店の端末）
+  | 変えられる所 | 中身 |
+  |---|---|
+  | お知らせ | 日付・出す場所（すべて／デイ／接骨院／ボディケア）・題名・くわしく・この日まで・下書き。トップは5件、各事業のページは3件 |
+  | 求人 | どの事業の募集か（デイ／接骨院／ボディケア／会社全体）・職種・雇用の形・仕事の内容・条件・給与・時間・休日・待遇・募集中かどうか |
+  | デイの時間 | 平日の午前・午後・日曜・営業日（デイのページの「ご利用の案内」） |
+  | ボディケアの料金 | 名前・料金（★予約ページの menus と同じ）・ホームページの説明・おすすめ。時間（分）は変えない |
+  | 写真 | 決まった12か所（`PHOTO_SLOTS`）。端末で長い辺1800に小さくしてから送る。storage の `site`（だれでも見られる）に置く |
+- 接骨院・ボディケアの受付時間は、設定の受付時間（kind=public）をそのまま出す（`data-rsv-cell`・`data-rsv-hours`）
+- だれでも読める関所 `action: "site"`。ページは元の中身を持っていて、読めたら差し替える（`site.js` の後半）
+- 採用ページ `docs/recruit/`。応募は `contact`（business=recruit・jobId）→ contact_messages に残して LINE で知らせる
+- アプリ開発のお問い合わせはフォーム（business=apps）。メールアドレスはページに書かず、画面で組み立てる（`data-mail`）
+- 表：`sql/lifeplus_site_v1.sql`（site_news・site_jobs・site_content、権限に site、storage の site）
+- 確かめ：`tests/site_test.ts`（関所 10項目）・`tests/e2e_cms_test.py`（画面 37項目）
+  ★テスト用DBは `now()` をテストの「今」にそろえる：`create function public.now() …` と `alter database … set search_path = public, pg_catalog`

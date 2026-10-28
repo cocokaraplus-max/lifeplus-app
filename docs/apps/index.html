@@ -16,14 +16,14 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Outfit:wght@300;400;500&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bangers&family=Dela+Gothic+One&display=swap">
-  <link rel="stylesheet" href="../site.css?v=20261028g">
+  <link rel="stylesheet" href="../site.css?v=20261028h">
 </head>
 <body class="c-app">
 <header class="site-top">
   <div class="wrap">
     <a class="logo" href="../" aria-label="LIFE PLUS トップへ"><img class="mk" src="../img/mark.svg" alt="" width="34" height="34"><img class="wm" src="../img/wordmark.png" alt="LIFE PLUS" width="117" height="18"></a>
     <button class="menu-btn" type="button" aria-expanded="false" aria-controls="nav">メニュー</button>
-    <nav class="nav" id="nav" aria-label="ページの案内"><a href="../dayservice/">デイサービス</a><a href="../sekkotsu/">接骨院</a><a href="../bodycare/">ボディケア</a><a href="../apps/" aria-current="page">アプリ開発</a><a href="../#access">アクセス</a><a class="rsv" href="https://liff.line.me/2012042545-nlHLpIre/yoyaku/">LINEで予約</a></nav>
+    <nav class="nav" id="nav" aria-label="ページの案内"><a href="../dayservice/">デイサービス</a><a href="../sekkotsu/">接骨院</a><a href="../bodycare/">ボディケア</a><a href="../apps/" aria-current="page">アプリ開発</a><a href="../recruit/">採用情報</a><a href="../#access">アクセス</a><a class="rsv" href="https://liff.line.me/2012042545-nlHLpIre/yoyaku/">LINEで予約</a></nav>
     <div class="size" role="group" aria-label="文字の大きさ">
       <span class="size-lb">文字</span>
       <button type="button" data-size="1" aria-pressed="true">標準</button>
@@ -40,12 +40,12 @@
     <p class="en">App development</p>
     <h1><small>介護施設向けのソフトづくり</small>アプリ開発</h1>
     <p class="lead">介護の現場を、テクノロジーで支える。記録・情報の共有・書類づくりの手間を減らして、職員が利用者さんと向き合う時間を増やします。</p>
-    <div class="btn-row"><a class="btn solid" href="mailto:hiro@lifeplusllc.com">メールでお問い合わせ</a></div>
+    <div class="btn-row"><a class="btn solid" href="#inquiry">お問い合わせ</a></div>
     <div class="strip" style="margin-top:36px">
       <div><b>サービス</b><span>TASUKARU</span></div>
       <div><b>対象</b><span>介護施設</span></div>
       <div><b>使い方</b><span>スマホ・パソコン</span></div>
-      <div><b>お問い合わせ</b><span>メール</span></div>
+      <div><b>お問い合わせ</b><span>フォーム</span></div>
     </div>
   </div>
 </div>
@@ -100,18 +100,39 @@
   </div>
 </section>
 
-<section id="contact">
+<section id="inquiry">
   <div class="wrap split">
     <div class="sec-head"><span class="en">Contact</span><h2>お問い合わせ</h2></div>
     <div>
-      <p>TASUKARU についてのご質問は、メールでお送りください。</p>
-      <p><a class="mail" href="mailto:hiro@lifeplusllc.com">hiro@lifeplusllc.com</a></p>
+      <p>TASUKARU についてのご質問・導入のご相談は、こちらからお送りください。内容はすぐに担当へ届きます。</p>
+    <form class="form" id="contact" data-business="apps" novalidate>
+      <label>ご用件
+        <select name="kind" required>
+          <option>TASUKARUについて</option>
+          <option>導入の相談</option>
+          <option>その他</option>
+        </select>
+      </label>
+      <div class="two">
+        <label>お名前 <small>（必須）</small><input name="name" autocomplete="name" maxlength="40" required></label>
+        <label>事業所名 <small>（任意）</small><input name="org" autocomplete="organization" maxlength="60"></label>
+      </div>
+      <div class="two">
+        <label>お電話 <small>（電話かメールのどちらかは必須）</small><input name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="20"></label>
+        <label>メール<input name="email" type="email" autocomplete="email" maxlength="120"></label>
+      </div>
+      <label>ご質問・ご相談の内容 <small>（任意。URL は書けません）</small><textarea name="body" maxlength="800"></textarea></label>
+      <div class="hp" aria-hidden="true"><label>空けておいてください<input name="website" tabindex="-1" autocomplete="off"></label></div>
+      <div class="msg" hidden role="status"></div>
+      <button class="btn solid" type="submit">この内容で送る</button>
+      <p class="muted small" style="margin:0">お預かりしたお名前・ご連絡先は、このお問い合わせへのお返事にだけ使います（<a href="../privacy/">プライバシーポリシー</a>）。営業のご案内はお受けしていません。</p>
+    </form>
       <dl class="facts" id="company" style="margin-top:28px">
         <dt>会社名</dt><dd>合同会社LIFE PLUS（LIFE PLUS LLC）</dd>
         <dt>代表</dt><dd>岸本 洋幸</dd>
         <dt>所在地</dt><dd>〒471-0832 愛知県豊田市丸山町7丁目49番地6</dd>
         <dt>事業内容</dt><dd>介護施設向け業務支援ソフト「TASUKARU」の開発・提供／機能訓練型デイサービス・接骨院・ボディケアの運営</dd>
-        <dt>メール</dt><dd><a href="mailto:hiro@lifeplusllc.com">hiro@lifeplusllc.com</a></dd>
+        <dt>メール</dt><dd><a data-mail="hiro" data-dom="lifeplusllc.com" href="#inquiry">お問い合わせフォーム</a></dd>
       </dl>
     </div>
   </div>
@@ -121,11 +142,12 @@
 <footer class="site-foot zoom">
   <div class="wrap">
     <div><img class="wm" src="../img/wordmark-w.png" alt="LIFE PLUS" width="143" height="22"><p>合同会社LIFE PLUS</p><p>〒471-0832<br>愛知県豊田市丸山町<br>7丁目49番地6</p></div>
-    <div><h4>Services</h4><p><a href="../dayservice/">機能訓練型デイサービス ココカラプラス</a></p><p><a href="../sekkotsu/">もみの木接骨院</a></p><p><a href="../bodycare/">HIROボディケアスタジオ</a></p><p><a href="../apps/">アプリ開発（TASUKARU）</a></p></div>
+    <div><h4>Services</h4><p><a href="../dayservice/">機能訓練型デイサービス ココカラプラス</a></p><p><a href="../sekkotsu/">もみの木接骨院</a></p><p><a href="../bodycare/">HIROボディケアスタジオ</a></p><p><a href="../apps/">アプリ開発（TASUKARU）</a></p><p><a href="../recruit/">採用情報</a></p></div>
     <div><h4>Contact</h4><p><a href="https://liff.line.me/2012042545-nlHLpIre/yoyaku/">接骨院・ボディケアのご予約（LINE）</a></p><p>デイサービス　<a href="tel:0565417804">0565-41-7804</a></p><p>FAX　0565-41-7814</p></div>
     <p class="copy"><a href="../privacy/">プライバシーポリシー</a><span>© LIFE PLUS LLC.</span></p>
   </div>
 </footer>
-<script src="../site.js?v=20261023f"></script>
+<script src="../config.js?v=20261023f"></script>
+<script src="../site.js?v=20261028h"></script>
 </body>
 </html>

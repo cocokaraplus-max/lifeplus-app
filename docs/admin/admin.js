@@ -63,6 +63,18 @@
     // customer-delete-staff-v1
     customer_has_line: "LINEでつながっているお客さまは、HIROさんの画面から消してください。",
     customer_has_booking: "これからの予約が入っています。先に予約を取り消してから消してください。",
+    // lifeplus-site-cms-v1
+    site_date_invalid: "日付を入れてください。",
+    site_title_required: "題名（名前）を入れてください。",
+    site_job_business: "どの事業の募集かを選んでください。",
+    site_hours_required: "利用時間を1つは入れてください。",
+    site_price_invalid: "料金は0円以上の数字で入れてください。",
+    site_menu_dup: "同じ名前のメニューがあります。名前を変えてください。",
+    site_not_found: "見つかりませんでした。画面を読み込み直してください。",
+    site_photo_slot: "その場所には写真を入れられません。",
+    site_photo_type: "写真として読み込めませんでした。JPEG か PNG の写真を選んでください。",
+    site_photo_size: "写真が大きすぎます（3MBまで）。",
+    site_photo_upload: "写真を置けませんでした。少しおいてお試しください。",
   };
   var WD = ["日", "月", "火", "水", "木", "金", "土"];
   var STATUS = { pending: "確認待ち", confirmed: "確定", done: "来院済み", no_show: "無断キャンセル", late_cancel: "直前キャンセル", cancelled: "取消", rejected: "お断り" };
@@ -118,6 +130,8 @@
     // device-perms-v2: お店の端末だけが持てる（LINE のスタッフには出さない）
     ["staff", "スタッフ・お店の端末の管理（追加・外す）", "スタッフ"],
     ["settings", "受付時間・予約の決まりごとの設定", "設定"],
+    // lifeplus-site-cms-v1: LINE のスタッフにも、お店の端末にも渡せる
+    ["site", "ホームページの変更（お知らせ・求人・料金・写真など）", "HP"],
   ];
   var STAFF_PERMS = PERM_LABELS.filter(function (p) { return p[0] !== "staff" && p[0] !== "settings"; });
   function bizClass(id) { return id === "mominoki" ? "mo" : "bc"; }
@@ -175,6 +189,7 @@
     off: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M6 6l12 12"/></svg>',
     cust: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.6.9 2.6 2.6 3 5.2"/></svg>',
     staff: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/><path d="M19 3v5M16.5 5.5h5"/></svg>',
+    site: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.8 3 2.8 15 0 18M12 3c-2.8 3-2.8 15 0 18"/></svg>',
     set: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>',
   };
   function sizes() {
@@ -185,8 +200,8 @@
   }
   function frame(barInner, mainHtml, extra) {
     var pc = A.day ? A.day.pendingCount : A.init.pendingCount;
-    var tabs = [["day", "予約表"], ["pending", "確認待ち"], ["off", "休み"], ["cust", "お客さま"], ["staff", "スタッフ"], ["set", "設定"]].filter(function (t) {
-      return t[0] === "off" ? can("closures") : t[0] === "cust" ? can("customers") : t[0] === "staff" ? can("staff") : t[0] === "set" ? can("settings") : true;   // device-perms-v2
+    var tabs = [["day", "予約表"], ["pending", "確認待ち"], ["off", "休み"], ["cust", "お客さま"], ["site", "HP"], ["staff", "スタッフ"], ["set", "設定"]].filter(function (t) {
+      return t[0] === "off" ? can("closures") : t[0] === "cust" ? can("customers") : t[0] === "staff" ? can("staff") : t[0] === "set" ? can("settings") : t[0] === "site" ? can("site") : true;   // device-perms-v2 / lifeplus-site-cms-v1
     }).map(function (t) {
       return '<button data-tab="' + t[0] + '" class="' + (A.tab === t[0] ? "on" : "") + '"' + (A.tab === t[0] ? ' aria-current="page"' : "") + ">" +
         ICONS[t[0]] + t[1] + (t[0] === "pending" && pc ? '<span class="badge">' + pc + "</span>" : "") + "</button>";
@@ -219,6 +234,7 @@
     if (tab === "off") return showOff();
     if (tab === "staff") return showStaff();
     if (tab === "set") return showSettings();   // lifeplus-settings-v1
+    if (tab === "site") return showSite();      // lifeplus-site-cms-v1
     return showCustomers();
   }
   function loadingMain(title) {
@@ -1097,6 +1113,176 @@
           A.set = JSON.parse(JSON.stringify(r));
           return api("admin_init").then(function (d) { d.me = A.init.me; A.init = d; renderSettings(); toast("保存しました"); });
         }, fail);
+    };
+  }
+
+  // =============================================================
+  // ホームページ（お知らせ・求人・デイの時間・ボディケアの料金・写真）  marker: lifeplus-site-cms-v1
+  //   site の権限がある人（HIROさん・権限を渡したスタッフ・お店の端末）だけ
+  // =============================================================
+  var SITE_SECS = [["news", "お知らせ"], ["jobs", "求人"], ["day", "デイの時間"], ["menus", "ボディケアの料金"], ["photos", "写真"]];
+  var NEWS_BIZ = [["all", "すべてのページ"], ["day", "デイサービス"], ["sekkotsu", "接骨院"], ["bodycare", "ボディケア"]];
+  var JOB_BIZ = [["day", "デイサービス"], ["sekkotsu", "接骨院"], ["bodycare", "ボディケア"], ["company", "会社全体"]];
+  var PHOTO_DEFAULT = {
+    top_hero: "day-outing.jpg", top_day: "day-origami.jpg", top_kotsu: "spine.jpg", top_body: "studio.jpg",
+    day_1: "day-origami.jpg", day_2: "building.jpg", kotsu_1: "care.jpg", kotsu_2: "spine.jpg",
+    body_1: "studio.jpg", body_2: "wreath.jpg", body_3: "plant.jpg", profile: "hiro.jpg",
+  };
+  function label(list, k) { var x = list.filter(function (p) { return p[0] === k; })[0]; return x ? x[1] : ""; }
+  function opts(list, cur) { return list.map(function (p) { return '<option value="' + p[0] + '"' + (p[0] === cur ? " selected" : "") + ">" + esc(p[1]) + "</option>"; }).join(""); }
+  function showSite() {
+    loadingMain("ホームページ");
+    api("admin_site").then(function (r) { A.site = r; A.siteSec = A.siteSec || "news"; renderSite(); }, fail);
+  }
+  function renderSite() {
+    var S = A.site, sec = A.siteSec, h = "";
+    h += '<div class="chips" role="group" aria-label="変える所">' + SITE_SECS.map(function (s) {
+      return '<button class="chip' + (sec === s[0] ? " on" : "") + '" data-ss="' + s[0] + '" aria-pressed="' + (sec === s[0]) + '">' + s[1] + "</button>";
+    }).join("") + "</div>";
+    if (sec === "news") {
+      h += '<button class="btn mint wide" id="nnew" style="margin:0 0 12px">＋ お知らせを書く</button>';
+      h += S.news.length ? S.news.map(function (n, i) {
+        var st = !n.published ? "下書き" : n.date > S.today ? "これから出る" : n.until && n.until < S.today ? "期限が過ぎた" : "出ている";
+        return '<button class="card site-item" data-ni="' + i + '"><span class="si-top"><span class="si-date">' + esc(mdj(n.date)) + "</span>" +
+          '<span class="si-tag">' + esc(label(NEWS_BIZ, n.business)) + "</span>" + '<span class="si-st' + (st === "出ている" ? " on" : "") + '">' + st + "</span></span>" +
+          '<b class="si-title">' + esc(n.title) + "</b></button>";
+      }).join("") : '<div class="empty">お知らせはまだありません</div>';
+    } else if (sec === "jobs") {
+      h += '<p class="note">「募集中」にした求人だけが、ホームページの採用情報に出ます。応募はフォームから届き、LINEでお知らせします。</p>';
+      h += '<button class="btn mint wide" id="jnew" style="margin:0 0 12px">＋ 求人を作る</button>';
+      h += S.jobs.length ? S.jobs.map(function (j, i) {
+        return '<button class="card site-item" data-ji="' + i + '"><span class="si-top"><span class="si-tag">' + esc(label(JOB_BIZ, j.business)) + "</span>" +
+          '<span class="si-tag">' + esc(j.employment) + "</span>" + '<span class="si-st' + (j.open ? " on" : "") + '">' + (j.open ? "募集中" : "募集していない") + "</span></span>" +
+          '<b class="si-title">' + esc(j.title) + "</b></button>";
+      }).join("") : '<div class="empty">求人はまだありません</div>';
+    } else if (sec === "day") {
+      var d = S.dayHours || {};
+      h += '<div class="card"><h2 style="margin-top:0">デイサービスの利用時間</h2>' +
+        '<label class="f"><span>平日の午前</span><input id="dha" maxlength="40" value="' + esc(d.am || "") + '" placeholder="例：9:00〜12:00"></label>' +
+        '<label class="f"><span>平日の午後</span><input id="dhp" maxlength="40" value="' + esc(d.pm || "") + '" placeholder="例：13:30〜16:30"></label>' +
+        '<label class="f"><span>日曜（1日型）</span><input id="dhs" maxlength="40" value="' + esc(d.sun || "") + '" placeholder="例：9:30〜16:30"></label>' +
+        '<label class="f"><span>営業日</span><input id="dhd" maxlength="80" value="' + esc(d.days || "") + '" placeholder="例：月曜〜金曜・日曜・祝日（土曜はお休み）"></label>' +
+        '<p class="note">接骨院・ボディケアの受付時間は「設定」の受付時間がそのままホームページに出ます。</p></div>' +
+        '<button class="btn mint wide" id="dhgo">保存する</button>';
+    } else if (sec === "menus") {
+      h += '<p class="note">★名前と料金は、お客さまの予約ページにも同じものが出ます。時間（分）は予約の枠に関わるため、ここでは変えられません。</p>';
+      h += S.menus.map(function (m, i) {
+        return '<div class="card"><label class="check" style="float:right;margin:0"><input type="radio" name="mfeat" value="' + i + '"' + (m.featured ? " checked" : "") + ">おすすめ</label>" +
+          '<div class="note" style="margin:0 0 4px">' + esc(m.durationMin) + "分</div>" +
+          '<label class="f"><span>名前</span><input data-mn="' + i + '" maxlength="30" value="' + esc(m.name) + '"></label>' +
+          '<label class="f"><span>料金（円）</span><input data-mp="' + i + '" type="number" inputmode="numeric" min="0" max="1000000" step="100" value="' + esc(m.priceYen == null ? "" : m.priceYen) + '"></label>' +
+          '<label class="f"><span>ホームページの説明（ひとこと）</span><textarea data-md="' + i + '" maxlength="200" style="min-height:70px">' + esc(m.description || "") + "</textarea></label></div>";
+      }).join("") + '<button class="btn mint wide" id="mgo">保存する</button>';
+    } else {
+      h += '<p class="note">写真を選ぶと、その場所の写真がすぐ入れ替わります。人の顔が写っている写真は、写っている方の了解をもらってから使ってください。</p>';
+      h += '<div class="photo-grid">' + Object.keys(S.slots).map(function (k) {
+        var custom = S.photos[k];
+        return '<div class="card photo-slot"><img alt="" src="' + esc(custom || "../img/ph/" + PHOTO_DEFAULT[k]) + '">' +
+          '<b>' + esc(S.slots[k]) + "</b><span class=\"note\" style=\"margin:2px 0 8px\">" + (custom ? "差し替え中" : "はじめの写真") + "</span>" +
+          '<label class="btn small line pick">写真を選ぶ<input type="file" accept="image/*" data-pslot="' + k + '" hidden></label>' +
+          (custom ? '<button class="link red" data-preset="' + k + '">はじめの写真に戻す</button>' : "") + "</div>";
+      }).join("") + "</div>";
+    }
+    frame('<div class="day"><h1 class="title">ホームページ</h1></div><div class="sub">変えたらすぐホームページに出ます　<a href="../" target="_blank" rel="noopener" style="color:#fff">ホームページを開く</a></div>', h);
+    on("[data-ss]", function (b) { A.siteSec = b.getAttribute("data-ss"); renderSite(); });
+    if ($("#nnew")) $("#nnew").onclick = function () { newsForm(null); };
+    on("[data-ni]", function (b) { newsForm(S.news[Number(b.getAttribute("data-ni"))]); });
+    if ($("#jnew")) $("#jnew").onclick = function () { jobForm(null); };
+    on("[data-ji]", function (b) { jobForm(S.jobs[Number(b.getAttribute("data-ji"))]); });
+    if ($("#dhgo")) $("#dhgo").onclick = function () {
+      busy($("#dhgo"), api("admin_site_day_hours", { dayHours: { am: $("#dha").value, pm: $("#dhp").value, sun: $("#dhs").value, days: $("#dhd").value } }))
+        .then(function (r) { S.dayHours = r.dayHours; toast("保存しました"); }, fail);
+    };
+    if ($("#mgo")) $("#mgo").onclick = function () {
+      var feat = $("input[name=mfeat]:checked");
+      var list = S.menus.map(function (m, i) {
+        return { id: m.id, name: $('[data-mn="' + i + '"]').value.trim(), priceYen: Number($('[data-mp="' + i + '"]').value),
+          description: $('[data-md="' + i + '"]').value.trim(), featured: !!feat && Number(feat.value) === i };
+      });
+      for (var i = 0; i < list.length; i++) {
+        if (!list[i].name) { toast("名前を入れてください。"); return; }
+        if (!(list[i].priceYen >= 0) || $('[data-mp="' + i + '"]').value === "") { toast("料金を入れてください。"); return; }
+      }
+      busy($("#mgo"), api("admin_site_menus", { menus: list })).then(function (r) { S.menus = r.menus; renderSite(); toast("保存しました"); }, fail);
+    };
+    $$("[data-pslot]").forEach(function (inp) { inp.onchange = function () { if (inp.files && inp.files[0]) uploadPhoto(inp.getAttribute("data-pslot"), inp.files[0], inp); }; });
+    on("[data-preset]", function (b) {
+      busy(b, api("admin_site_photo_reset", { slot: b.getAttribute("data-preset") })).then(function (r) { S.photos = r.photos; renderSite(); toast("はじめの写真に戻しました"); }, fail);
+    });
+  }
+  // 写真は、端末の中で小さくしてから送る（長い辺を1800まで・JPEG）
+  function uploadPhoto(slot, file, inp) {
+    var lb = inp.closest(".pick"); if (lb) lb.classList.add("busy");
+    var url = URL.createObjectURL(file), img = new Image();
+    img.onload = function () {
+      var max = 1800, w = img.naturalWidth, h = img.naturalHeight, r = Math.min(1, max / Math.max(w, h));
+      var cv = document.createElement("canvas"); cv.width = Math.round(w * r); cv.height = Math.round(h * r);
+      cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(url);
+      var data = cv.toDataURL("image/jpeg", 0.85);
+      api("admin_site_photo", { slot: slot, type: "image/jpeg", data: data }).then(function (r) {
+        A.site.photos = r.photos; renderSite(); toast("写真を入れ替えました");
+      }, function (e) { if (lb) lb.classList.remove("busy"); fail(e); });
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); if (lb) lb.classList.remove("busy"); toast("この写真は読み込めませんでした。JPEG か PNG の写真を選んでください。"); };
+    img.src = url;
+  }
+  function newsForm(n) {
+    var x = n || { date: A.site.today, business: "all", title: "", body: "", until: "", published: true };
+    openSheet("<h3>" + (n ? "お知らせを直す" : "お知らせを書く") + "</h3>" +
+      '<label class="f"><span>日付（この日から出ます）</span><input type="date" id="nd" value="' + esc(x.date) + '"></label>' +
+      '<label class="f"><span>出す場所</span><select id="nb">' + opts(NEWS_BIZ, x.business) + "</select></label>" +
+      '<label class="f"><span>題名（必須）</span><input id="nt" maxlength="60" value="' + esc(x.title) + '" placeholder="例：年末年始のお休みについて"></label>' +
+      '<label class="f"><span>くわしく（なくても大丈夫です）</span><textarea id="nx" maxlength="600">' + esc(x.body) + "</textarea></label>" +
+      '<label class="f"><span>この日まで出す（なくても大丈夫です）</span><input type="date" id="nu" value="' + esc(x.until) + '"></label>' +
+      '<label class="check"><input type="checkbox" id="np"' + (x.published ? " checked" : "") + ">ホームページに出す（外すと下書き）</label>" +
+      '<button class="btn mint wide" id="ngo">保存する</button>' +
+      (n ? '<div class="danger-zone" style="text-align:center"><button class="link red" id="ndel">このお知らせを消す</button></div>' : "") +
+      '<button class="btn gray wide" id="nno">やめる</button>');
+    $("#nno").onclick = closeSheet;
+    $("#ngo").onclick = function () {
+      if (!$("#nd").value) { toast("日付を入れてください。"); return; }
+      if (!$("#nt").value.trim()) { toast("題名を入れてください。"); return; }
+      busy($("#ngo"), api("admin_site_news_save", { id: n ? n.id : "", date: $("#nd").value, business: $("#nb").value, title: $("#nt").value,
+        body: $("#nx").value, until: $("#nu").value, published: $("#np").checked })).then(function () { closeSheet(); toast("保存しました"); showSite(); }, fail);
+    };
+    if ($("#ndel")) $("#ndel").onclick = function () {
+      confirmSheet("このお知らせを消しますか？", "「" + n.title + "」を消します。元に戻せません。", "消す", function () {
+        return api("admin_site_news_del", { id: n.id }).then(function () { closeSheet(); toast("消しました"); showSite(); });
+      });
+    };
+  }
+  function jobForm(j) {
+    var x = j || { business: "day", title: "", employment: "", summary: "", duties: "", requirements: "", salary: "", hours: "", holidays: "", benefits: "", open: true, sort: 0 };
+    var ta = function (id, lb, v, ph) { return '<label class="f"><span>' + lb + '</span><textarea id="' + id + '" maxlength="1000" style="min-height:80px" placeholder="' + esc(ph || "") + '">' + esc(v) + "</textarea></label>"; };
+    openSheet("<h3>" + (j ? "求人を直す" : "求人を作る") + "</h3>" +
+      '<label class="f"><span>どの事業の募集か</span><select id="jb">' + opts(JOB_BIZ, x.business) + "</select></label>" +
+      '<label class="f"><span>職種（必須）</span><input id="jt" maxlength="40" value="' + esc(x.title) + '" placeholder="例：介護職員・柔道整復師・受付"></label>' +
+      '<label class="f"><span>雇用の形（必須）</span><input id="je" maxlength="30" list="jel" value="' + esc(x.employment) + '" placeholder="例：パート"><datalist id="jel"><option>正社員</option><option>パート</option><option>アルバイト</option><option>契約社員</option></datalist></label>' +
+      '<label class="f"><span>ひとこと</span><input id="js" maxlength="200" value="' + esc(x.summary) + '" placeholder="例：週2日・午前だけでもOK"></label>' +
+      ta("jd", "仕事の内容", x.duties, "例：送迎・機能訓練の補助・記録（TASUKARUを使います）") +
+      ta("jr", "応募の条件（資格・経験）", x.requirements, "例：介護職員初任者研修以上。未経験の方も歓迎") +
+      ta("jy", "給与", x.salary, "例：時給1,100円〜（経験・資格により決めます）") +
+      ta("jh", "勤務時間", x.hours, "例：8:30〜17:30の間で相談") +
+      ta("jo", "休日", x.holidays, "例：土曜・年末年始") +
+      ta("jf", "待遇・手当", x.benefits, "例：交通費支給・車通勤OK") +
+      '<label class="f"><span>並び順（小さい数ほど上）</span><input id="jn" type="number" min="0" max="999" value="' + esc(x.sort) + '"></label>' +
+      '<label class="check"><input type="checkbox" id="jp"' + (x.open ? " checked" : "") + ">募集中（ホームページの採用情報に出す）</label>" +
+      '<button class="btn mint wide" id="jgo">保存する</button>' +
+      (j ? '<div class="danger-zone" style="text-align:center"><button class="link red" id="jdel">この求人を消す</button></div>' : "") +
+      '<button class="btn gray wide" id="jno">やめる</button>');
+    $("#jno").onclick = closeSheet;
+    $("#jgo").onclick = function () {
+      if (!$("#jt").value.trim() || !$("#je").value.trim()) { toast("職種と雇用の形を入れてください。"); return; }
+      busy($("#jgo"), api("admin_site_job_save", { id: j ? j.id : "", business: $("#jb").value, title: $("#jt").value, employment: $("#je").value,
+        summary: $("#js").value, duties: $("#jd").value, requirements: $("#jr").value, salary: $("#jy").value, hours: $("#jh").value,
+        holidays: $("#jo").value, benefits: $("#jf").value, sort: Number($("#jn").value) || 0, open: $("#jp").checked }))
+        .then(function () { closeSheet(); toast("保存しました"); showSite(); }, fail);
+    };
+    if ($("#jdel")) $("#jdel").onclick = function () {
+      confirmSheet("この求人を消しますか？", "「" + j.title + "」を消します。元に戻せません。募集をやめるだけなら「募集中」を外してください。", "消す", function () {
+        return api("admin_site_job_del", { id: j.id }).then(function () { closeSheet(); toast("消しました"); showSite(); });
+      });
     };
   }
 

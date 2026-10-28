@@ -524,3 +524,66 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
 /* ---------- 現場から生まれたソフト（lifeplus-story-v1）---------- */
 .story-key { font-family: var(--head); font-weight: 700; font-size: clamp(20px, 2.2vw, 26px); line-height: 1.7; color: var(--navy-ink);
   border-left: 5px solid var(--orange); padding: 4px 0 4px 18px; margin: 28px 0; }
+
+/* ---------- お知らせ・採用（lifeplus-site-cms-v1）---------- */
+.news-band { padding: clamp(36px, 5vw, 64px) 0; border-bottom: 1px solid var(--line); }
+.news-in { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 9fr); gap: clamp(16px, 4vw, 56px); align-items: start; }
+.news-in .sec-head { margin: 0; }
+.news-in .sec-head h2 { font-size: clamp(22px, 2.4vw, 28px); }
+.news-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.news-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.news-list time { font-family: var(--en); color: var(--sub); font-size: 15px; min-width: 6.5em; }
+.news-list .nb { font-size: 12px; font-weight: 700; border-radius: 999px; padding: 1px 10px; background: var(--mist); color: var(--sub); }
+.news-list .nb-day { background: var(--orange-soft); color: var(--orange-ink); }
+.news-list .nb-sekkotsu { background: var(--green-soft); color: var(--green-ink); }
+.news-list .nb-bodycare { background: var(--plum-soft); color: var(--plum-ink); }
+.news-list .nt, .news-list details { flex: 1 1 18em; font-weight: 700; }
+.news-list summary { cursor: pointer; }
+.news-list details p { font-weight: 400; margin: 8px 0 0; color: var(--ink); }
+.page-head + .news-band { border-bottom: 0; padding-bottom: 0; }
+@media (max-width: 760px) { .news-in { grid-template-columns: 1fr; } }
+
+.recruit-band { background: var(--orange-soft); }
+.recruit-in { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px 40px; }
+.recruit-band .en { font-family: var(--en); color: var(--orange-ink); font-size: 15px; display: flex; align-items: center; gap: 10px; margin: 0 0 10px; }
+.recruit-band .en::before { content: ""; width: 28px; height: 2px; background: currentColor; }
+.recruit-band h2 { font-size: clamp(26px, 3.2vw, 40px); margin-bottom: 10px; }
+.recruit-band p { margin: 0; }
+.recruit-band b[data-job-count] { display: inline-block; margin-left: 10px; color: var(--orange-ink); }
+@media (max-width: 760px) { .recruit-band .btn { width: 100%; } }
+
+.job-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 20px; }
+.job-chips button { font: inherit; font-weight: 700; font-size: 15px; border: 2px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 18px; cursor: pointer; }
+.job-chips button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+.jobs { display: grid; gap: 22px; }
+.job { border: 1px solid var(--line); border-radius: 24px; padding: clamp(20px, 3vw, 36px); background: #fff; border-top: 6px solid var(--c); }
+.job-head { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.job-biz, .job-emp { font-size: 13px; font-weight: 700; border-radius: 999px; padding: 2px 12px; }
+.job-biz { background: var(--cs); color: var(--ci); }
+.job-emp { background: var(--mist); color: var(--sub); }
+.job h3 { font-size: clamp(22px, 2.4vw, 28px); margin-bottom: 8px; }
+.job-sum { color: var(--sub); }
+.job .facts { margin: 14px 0 20px; }
+.job .btn { justify-self: start; }
+/* ---------- Instagram をカラーのマークで（lifeplus-insta-v2）---------- */
+.insta { display: block; margin-top: 22px; }
+.insta-lb { display: block; margin: 0 0 12px; font-weight: 700; color: var(--ci); }
+.insta-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; max-width: 760px; }
+.insta a.insta-card { display: flex; flex-direction: row; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 20px; background: #fff;
+  color: var(--ink); text-decoration: none; position: relative; outline: 0;
+  border: 2px solid transparent; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(120deg, #feda75, #fa7e1e, #d62976, #962fbf, #4f5bd5) border-box;
+  box-shadow: 0 6px 18px rgba(214, 41, 118, .10); transition: transform .15s, box-shadow .15s; }
+.insta a.insta-card:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(214, 41, 118, .18); }
+.insta .ig-mark { width: 44px; height: 44px; flex: none; }
+.ig-txt { display: flex; flex-direction: column; line-height: 1.4; min-width: 0; }
+.ig-txt b { font-family: var(--en); font-weight: 600; font-size: 17px; color: var(--ink); overflow-wrap: anywhere; }
+.ig-txt small { font-size: 13px; color: var(--sub); }
+.ig-go { margin-left: auto; flex: none; font-size: 14px; font-weight: 700; color: #fff; border-radius: 999px; padding: 6px 14px;
+  background: linear-gradient(120deg, #fa7e1e, #d62976 55%, #962fbf); }
+.ig-go span { margin-left: 4px; }
+.insta a.insta-card .ig-txt b { color: var(--ink); }
+.insta a.insta-card .ig-txt small { color: var(--sub); }
+.insta a.insta-card .ig-go, .insta a.insta-card .ig-go span { color: #fff; font-size: 14px; }
+.btn .ig-mark { width: 22px; height: 22px; }
+@media (max-width: 560px) { .insta a.insta-card { flex: initial; } }
+

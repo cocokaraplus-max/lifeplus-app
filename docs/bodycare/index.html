@@ -15,14 +15,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Outfit:wght@300;400;500&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap">
-  <link rel="stylesheet" href="../site.css?v=20261028d">
+  <link rel="stylesheet" href="../site.css?v=20261028h">
 </head>
 <body class="c-body">
 <header class="site-top">
   <div class="wrap">
     <a class="logo" href="../" aria-label="LIFE PLUS トップへ"><img class="mk" src="../img/mark.svg" alt="" width="34" height="34"><img class="wm" src="../img/wordmark.png" alt="LIFE PLUS" width="117" height="18"></a>
     <button class="menu-btn" type="button" aria-expanded="false" aria-controls="nav">メニュー</button>
-    <nav class="nav" id="nav" aria-label="ページの案内"><a href="../dayservice/">デイサービス</a><a href="../sekkotsu/">接骨院</a><a href="../bodycare/" aria-current="page">ボディケア</a><a href="../apps/">アプリ開発</a><a href="../#access">アクセス</a><a class="rsv" href="https://liff.line.me/2012042545-nlHLpIre/yoyaku/">LINEで予約</a></nav>
+    <nav class="nav" id="nav" aria-label="ページの案内"><a href="../dayservice/">デイサービス</a><a href="../sekkotsu/">接骨院</a><a href="../bodycare/" aria-current="page">ボディケア</a><a href="../apps/">アプリ開発</a><a href="../recruit/">採用情報</a><a href="../#access">アクセス</a><a class="rsv" href="https://liff.line.me/2012042545-nlHLpIre/yoyaku/">LINEで予約</a></nav>
     <div class="size" role="group" aria-label="文字の大きさ">
       <span class="size-lb">文字</span>
       <button type="button" data-size="1" aria-pressed="true">標準</button>
@@ -42,18 +42,22 @@
   </div>
 </div>
 
+<section class="news-band" data-news="bodycare" data-max="3" hidden aria-label="お知らせ"><!-- lifeplus-site-cms-v1 -->
+  <div class="wrap news-in"><div class="sec-head"><span class="en">News</span><h2>お知らせ</h2></div><ul class="news-list"></ul></div>
+</section>
+
 <div class="photos-band"><!-- lifeplus-site-photos-v1 -->
   <div class="wrap photos">
-    <figure><img src="../img/ph/studio.jpg" alt="スタジオの棚（アロマのオイルと置物）" width="1024" height="768" loading="lazy"></figure>
-    <figure><img src="../img/ph/wreath.jpg" alt="壁のドライフラワーのリース" width="1024" height="768" loading="lazy"></figure>
-    <figure><img src="../img/ph/plant.jpg" alt="観葉植物" width="768" height="576" loading="lazy"></figure>
+    <figure><img data-photo="body_1" src="../img/ph/studio.jpg" alt="スタジオの棚（アロマのオイルと置物）" width="1024" height="768" loading="lazy"></figure>
+    <figure><img data-photo="body_2" src="../img/ph/wreath.jpg" alt="壁のドライフラワーのリース" width="1024" height="768" loading="lazy"></figure>
+    <figure><img data-photo="body_3" src="../img/ph/plant.jpg" alt="観葉植物" width="768" height="576" loading="lazy"></figure>
   </div>
 </div>
 
 <section id="menu">
   <div class="wrap split">
     <div class="sec-head"><span class="en">Menu</span><h2>メニュー</h2><p class="muted" style="margin-top:12px">健康保険は使えません。</p></div>
-    <div class="menu">
+    <div class="menu" data-menus>
       <div class="menu-item main"><h3>慢性症状アプローチ<small>60 min</small></h3><span class="price">¥10,000</span><p>トリガーポイントケアと筋膜トリートメント。痛みの原因を確かめながら進めます。</p></div>
       <div class="menu-item"><h3>ちょっとお試しコース<small>30 min</small></h3><span class="price">¥4,000</span><p>はじめての方に。リラクゼーションのボディケアです。</p></div>
       <div class="menu-item"><h3>眠れるボディケアコース<small>60 min</small></h3><span class="price">¥8,000</span><p>リラクゼーションのボディケア。</p></div>
@@ -75,7 +79,7 @@
 
 <section>
   <div class="wrap split">
-    <div class="sec-head"><span class="en">Therapist</span><h2>施術する人</h2><img class="portrait" src="../img/ph/hiro.jpg" alt="HIRO（岸本 洋幸）" width="1200" height="1112" loading="lazy"></div>
+    <div class="sec-head"><span class="en">Therapist</span><h2>施術する人</h2><img class="portrait" data-photo="profile" src="../img/ph/hiro.jpg" alt="HIRO（岸本 洋幸）" width="1200" height="1112" loading="lazy"></div>
     <div class="profile has-portrait">
       <div class="ph"><img src="../img/ph/hiro-face.jpg" alt="" width="360" height="360" loading="lazy"></div>
       <div>
@@ -109,7 +113,7 @@
 
 <section>
   <div class="wrap access">
-    <div><div class="sec-head"><span class="en">Access</span><h2>アクセス</h2></div><p class="addr">愛知県豊田市丸山町<br>7丁目49番地6</p><p class="muted">もみの木接骨院と同じ建物です。受付は 月・木 17:00〜20:00／土 9:00〜12:00（予約制）。</p><p><a class="btn outline" href="https://www.google.com/maps/search/?api=1&query=%E6%84%9B%E7%9F%A5%E7%9C%8C%E8%B1%8A%E7%94%B0%E5%B8%82%E4%B8%B8%E5%B1%B1%E7%94%BA7-49-6" target="_blank" rel="noopener">Googleマップで開く</a></p></div>
+    <div><div class="sec-head"><span class="en">Access</span><h2>アクセス</h2></div><p class="addr">愛知県豊田市丸山町<br>7丁目49番地6</p><p class="muted">もみの木接骨院と同じ建物です。受付は <span data-rsv-hours="text">月・木 17:00〜20:00／土 9:00〜12:00</span>（予約制）。</p><p><a class="btn outline" href="https://www.google.com/maps/search/?api=1&query=%E6%84%9B%E7%9F%A5%E7%9C%8C%E8%B1%8A%E7%94%B0%E5%B8%82%E4%B8%B8%E5%B1%B1%E7%94%BA7-49-6" target="_blank" rel="noopener">Googleマップで開く</a></p></div>
     <iframe class="map" title="地図：豊田市丸山町7-49-6" src="https://www.google.com/maps?q=%E6%84%9B%E7%9F%A5%E7%9C%8C%E8%B1%8A%E7%94%B0%E5%B8%82%E4%B8%B8%E5%B1%B1%E7%94%BA7-49-6&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
   </div>
 </section>
@@ -118,11 +122,12 @@
 <footer class="site-foot zoom">
   <div class="wrap">
     <div><img class="wm" src="../img/wordmark-w.png" alt="LIFE PLUS" width="143" height="22"><p>合同会社LIFE PLUS</p><p>〒471-0832<br>愛知県豊田市丸山町<br>7丁目49番地6</p></div>
-    <div><h4>Services</h4><p><a href="../dayservice/">機能訓練型デイサービス ココカラプラス</a></p><p><a href="../sekkotsu/">もみの木接骨院</a></p><p><a href="../bodycare/">HIROボディケアスタジオ</a></p><p><a href="../apps/">アプリ開発（TASUKARU）</a></p></div>
+    <div><h4>Services</h4><p><a href="../dayservice/">機能訓練型デイサービス ココカラプラス</a></p><p><a href="../sekkotsu/">もみの木接骨院</a></p><p><a href="../bodycare/">HIROボディケアスタジオ</a></p><p><a href="../apps/">アプリ開発（TASUKARU）</a></p><p><a href="../recruit/">採用情報</a></p></div>
     <div><h4>Contact</h4><p><a href="https://liff.line.me/2012042545-nlHLpIre/yoyaku/">接骨院・ボディケアのご予約（LINE）</a></p><p>デイサービス　<a href="tel:0565417804">0565-41-7804</a></p><p>FAX　0565-41-7814</p></div>
     <p class="copy"><!-- lifeplus-apps-v1 --><a href="../privacy/">プライバシーポリシー</a><span>© LIFE PLUS LLC.</span></p>
   </div>
 </footer>
-<script src="../site.js?v=20261023f"></script>
+<script src="../config.js?v=20261023f"></script>
+<script src="../site.js?v=20261028h"></script>
 </body>
 </html>

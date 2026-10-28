@@ -22,14 +22,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Outfit:wght@300;400;500&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap">
-  <link rel="stylesheet" href="site.css?v=20261028f">
+  <link rel="stylesheet" href="site.css?v=20261028h">
 </head>
 <body>
 <header class="site-top">
   <div class="wrap">
     <a class="logo" href="" aria-label="LIFE PLUS トップへ"><img class="mk" src="img/mark.svg" alt="" width="34" height="34"><img class="wm" src="img/wordmark.png" alt="LIFE PLUS" width="117" height="18"></a>
     <button class="menu-btn" type="button" aria-expanded="false" aria-controls="nav">メニュー</button>
-    <nav class="nav" id="nav" aria-label="ページの案内"><a href="dayservice/">デイサービス</a><a href="sekkotsu/">接骨院</a><a href="bodycare/">ボディケア</a><a href="apps/">アプリ開発</a><a href="#access">アクセス</a><a class="rsv" href="https://liff.line.me/2012042545-nlHLpIre/yoyaku/">LINEで予約</a></nav>
+    <nav class="nav" id="nav" aria-label="ページの案内"><a href="dayservice/">デイサービス</a><a href="sekkotsu/">接骨院</a><a href="bodycare/">ボディケア</a><a href="apps/">アプリ開発</a><a href="recruit/">採用情報</a><a href="#access">アクセス</a><a class="rsv" href="https://liff.line.me/2012042545-nlHLpIre/yoyaku/">LINEで予約</a></nav>
     <div class="size" role="group" aria-label="文字の大きさ">
       <span class="size-lb">文字</span>
       <button type="button" data-size="1" aria-pressed="true">標準</button>
@@ -48,11 +48,15 @@
       <div class="btn-row"><a class="btn dark" href="#services">事業を見る</a><a class="btn line" href="https://liff.line.me/2012042545-nlHLpIre/yoyaku/"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3C6.5 3 2 6.6 2 11c0 3.9 3.5 7.2 8.3 7.9.3.1.8.2.9.5.1.3.1.7 0 1l-.1.9c0 .3-.2 1 .9.6 1.1-.5 6-3.5 8.2-6 1.5-1.6 2.2-3.3 2.2-5C22.4 6.6 17.9 3 12 3z"/></svg>LINEで予約</a></div>
     </div>
     <figure class="hero-photo wide"><!-- lifeplus-site-photos-v1 -->
-      <!-- lifeplus-hero-v2 --><img src="img/ph/day-outing.jpg" alt="桜の下のベンチに、デイサービスのみなさんと職員が並んで座っている様子" width="1477" height="1108" fetchpriority="high">
+      <!-- lifeplus-hero-v2 --><img data-photo="top_hero" src="img/ph/day-outing.jpg" alt="桜の下のベンチに、デイサービスのみなさんと職員が並んで座っている様子" width="1477" height="1108" fetchpriority="high">
       <img class="mk" src="img/mark.svg" alt="" width="412" height="413">
     </figure>
   </div>
 </div>
+
+<section class="news-band" data-news="all" data-max="5" hidden aria-label="お知らせ"><!-- lifeplus-site-cms-v1 -->
+  <div class="wrap news-in"><div class="sec-head"><span class="en">News</span><h2>お知らせ</h2></div><ul class="news-list"></ul></div>
+</section>
 
 <section class="motto" aria-label="社訓">
   <div class="wrap">
@@ -78,19 +82,19 @@
   <div class="wrap">
     <div class="sec-head"><span class="en">Services</span><h2>3つの事業</h2></div>
     <a class="svc c-day" href="dayservice/">
-      <div class="ph"><!-- lifeplus-day-photo-v1 --><img src="img/ph/day-origami.jpg" alt="デイサービスで、みなさんが作った折り紙の花を見せている様子" width="1477" height="1108" loading="lazy"></div>
+      <div class="ph"><!-- lifeplus-day-photo-v1 --><img data-photo="top_day" src="img/ph/day-origami.jpg" alt="デイサービスで、みなさんが作った折り紙の花を見せている様子" width="1477" height="1108" loading="lazy"></div>
       <div class="name"><span class="en">Day service</span><h3>ココカラプラス</h3><span class="kind">機能訓練型デイサービス（地域密着型通所介護）</span></div>
       <div class="body"><p>機械よりも人の手で。おひとりおひとりの体に合わせた機能訓練で、ご自宅でも続けられる運動を一緒に。</p>
         <ul class="tags"><li>平日2単位・日曜1日型</li><li>送迎あり</li><li>見学できます</li></ul><span class="more">くわしく見る</span></div>
     </a>
     <a class="svc c-kotsu" href="sekkotsu/">
-      <div class="ph"><img src="img/ph/spine.jpg" alt="背骨と骨盤の模型" width="800" height="600" loading="lazy"></div>
+      <div class="ph"><img data-photo="top_kotsu" src="img/ph/spine.jpg" alt="背骨と骨盤の模型" width="800" height="600" loading="lazy"></div>
       <div class="name"><span class="en">Bone-setting clinic</span><h3>もみの木接骨院</h3><span class="kind">ケガ・交通事故</span></div>
       <div class="body"><p>骨折・脱臼・捻挫・打撲・挫傷は健康保険で。交通事故のケガは自賠責保険で施術を受けられます。</p>
         <ul class="tags"><li>健康保険</li><li>交通事故</li><li>予約制</li></ul><span class="more">くわしく見る</span></div>
     </a>
     <a class="svc c-body" href="bodycare/">
-      <div class="ph"><img src="img/ph/studio.jpg" alt="ボディケアスタジオの棚（アロマのオイルと置物）" width="1024" height="768" loading="lazy"></div>
+      <div class="ph"><img data-photo="top_body" src="img/ph/studio.jpg" alt="ボディケアスタジオの棚（アロマのオイルと置物）" width="1024" height="768" loading="lazy"></div>
       <div class="name"><span class="en">Body care studio</span><h3>HIROボディケアスタジオ</h3><span class="kind">慢性の腰痛・肩こり（保険外）</span></div>
       <div class="body"><p>くり返す痛みには、くり返す理由があります。トリガーポイントと筋膜、毎日の食事まで、体をまるごと見直します。</p>
         <ul class="tags"><li>トリガーポイント</li><li>筋膜</li><li>食事のアドバイス</li></ul><span class="more">くわしく見る</span></div>
@@ -107,6 +111,17 @@
       <a class="btn light" href="apps/">アプリ開発について</a>
     </div>
     <figure class="app-card ph-card"><!-- lifeplus-tasukarukun-v1 --><img src="img/ph/tsk-run.jpg" alt="介護事業所の前を駆けるタスカルくん" width="1400" height="1120" loading="lazy"><figcaption><span class="en">TASUKARU</span><b>タスカル</b></figcaption></figure>
+  </div>
+</section>
+
+<section class="recruit-band">
+  <div class="wrap recruit-in">
+    <div>
+      <p class="en">Recruit</p>
+      <h2>一緒に働きませんか</h2>
+      <p>デイサービス・接骨院で、いっしょに働く仲間を募集しています。<b data-job-count hidden></b></p>
+    </div>
+    <a class="btn dark" href="recruit/">採用情報を見る</a>
   </div>
 </section>
 
@@ -130,8 +145,8 @@
       <div class="c-app">
         <div class="who"><span>アプリ開発（TASUKARU）</span></div>
         <h3>ソフトについてのお問い合わせ</h3>
-        <p class="muted" style="margin:0">TASUKARU についてのご質問は、メールでお送りください。</p>
-        <a class="mail" href="mailto:hiro@lifeplusllc.com">hiro@lifeplusllc.com</a>
+        <p class="muted" style="margin:0">TASUKARU についてのご質問・導入のご相談は、フォームからお送りください。</p>
+        <div><a class="btn outline" href="apps/#inquiry">フォームで問い合わせる</a></div>
       </div>
     </div>
   </div>
@@ -150,7 +165,7 @@
         <dt>代表</dt><dd>岸本 洋幸（柔道整復師）</dd>
         <dt>設立</dt><dd>2014年11月</dd>
         <dt>事業内容</dt><dd>機能訓練型デイサービス（地域密着型通所介護）／接骨院／ボディケア／介護施設向けソフト「TASUKARU」の開発・提供</dd>
-        <dt>メール</dt><dd><a href="mailto:hiro@lifeplusllc.com">hiro@lifeplusllc.com</a></dd>
+        <dt>メール</dt><dd><a data-mail="hiro" data-dom="lifeplusllc.com" href="apps/#inquiry">お問い合わせフォーム</a></dd>
       </dl>
     </div>
     <iframe class="map" title="地図：豊田市丸山町7-49-6" src="https://www.google.com/maps?q=%E6%84%9B%E7%9F%A5%E7%9C%8C%E8%B1%8A%E7%94%B0%E5%B8%82%E4%B8%B8%E5%B1%B1%E7%94%BA7-49-6&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
@@ -160,11 +175,12 @@
 <footer class="site-foot zoom">
   <div class="wrap">
     <div><img class="wm" src="img/wordmark-w.png" alt="LIFE PLUS" width="143" height="22"><p>合同会社LIFE PLUS</p><p>〒471-0832<br>愛知県豊田市丸山町<br>7丁目49番地6</p></div>
-    <div><h4>Services</h4><p><a href="dayservice/">機能訓練型デイサービス ココカラプラス</a></p><p><a href="sekkotsu/">もみの木接骨院</a></p><p><a href="bodycare/">HIROボディケアスタジオ</a></p><p><a href="apps/">アプリ開発（TASUKARU）</a></p></div>
+    <div><h4>Services</h4><p><a href="dayservice/">機能訓練型デイサービス ココカラプラス</a></p><p><a href="sekkotsu/">もみの木接骨院</a></p><p><a href="bodycare/">HIROボディケアスタジオ</a></p><p><a href="apps/">アプリ開発（TASUKARU）</a></p><p><a href="recruit/">採用情報</a></p></div>
     <div><h4>Contact</h4><p><a href="https://liff.line.me/2012042545-nlHLpIre/yoyaku/">接骨院・ボディケアのご予約（LINE）</a></p><p>デイサービス　<a href="tel:0565417804">0565-41-7804</a></p><p>FAX　0565-41-7814</p></div>
     <p class="copy"><!-- lifeplus-apps-v1 --><a href="privacy/">プライバシーポリシー</a><span>© LIFE PLUS LLC.</span></p>
   </div>
 </footer>
-<script src="site.js?v=20261023f"></script>
+<script src="config.js?v=20261023f"></script>
+<script src="site.js?v=20261028h"></script>
 </body>
 </html>

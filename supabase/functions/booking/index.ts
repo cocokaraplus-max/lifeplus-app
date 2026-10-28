@@ -1,6 +1,6 @@
 // =============================================================
 // LIFE PLUS 予約  関所（Supabase Edge Function: booking）
-// marker: lifeplus-booking-fn-v1 / admin-notify-v1 / notify-contact-v1 / admin-api-v1 / staff-perms-v1 / site-contact-v1 / admin-device-v1
+// marker: lifeplus-booking-fn-v1 / admin-notify-v1 / notify-contact-v1 / admin-api-v1 / staff-perms-v1 / site-contact-v1 / admin-device-v1 / lifeplus-site-cms-v1
 //
 // 予約ページ（LIFF）からの依頼は、すべてここを通る。
 //   1. LINE の ID トークンを LINE 本体に問い合わせて、本人を確かめる
@@ -43,6 +43,8 @@ export interface Deps {
   notify?: (to: string[], text: string) => Promise<void>;
   // site-contact-v1: お問い合わせを送ってきた所（いたずら止めにだけ使う。そのままは残さない）
   clientIp?: string;
+  // lifeplus-site-cms-v1: ホームページの写真を storage に置き、見られる URL を返す
+  putImage?: (path: string, bytes: Uint8Array, type: string) => Promise<string>;
 }
 
 // ---------- 日付（日本時間） ----------
@@ -126,7 +128,7 @@ async function adminIds(sql: Sql): Promise<string[]> {
 }
 
 // ---------- 管理画面を使える人  marker: staff-perms-v1 ----------
-export const PERMS = ["closures", "bookings", "customers", "notify"] as const;
+export const PERMS = ["closures", "bookings", "customers", "notify", "site"] as const;   // lifeplus-site-cms-v1: site＝ホームページの変更
 // 操作ごとに要る権限（null は全員、owner はHIROさんだけ）
 const PERM_OF: Record<string, string | null> = {
   admin_init: null, admin_day: null, admin_month: null, admin_pending: null,
@@ -137,7 +139,10 @@ const PERM_OF: Record<string, string | null> = {
   // device-perms-v2: スタッフ・端末の管理と、設定。★お店の端末だけが持てる（LINE のスタッフは持てない：staff_perms_ok）
   admin_staff: "staff", admin_staff_invite: "staff", admin_staff_update: "staff", admin_staff_del: "staff",
   admin_devices: "staff", admin_device_code: "staff", admin_device_update: "staff", admin_device_del: "staff",
-  admin_settings: "settings", admin_settings_save: "settings",   // customer-delete-staff-v1: HIROさん以外は、LINEなし・これからの予約なしの人だけ（下の runAdmin で見る）
+  admin_settings: "settings", admin_settings_save: "settings",
+  // lifeplus-site-cms-v1: ホームページ（お知らせ・求人・時間・料金・写真）
+  admin_site: "site", admin_site_news_save: "site", admin_site_news_del: "site", admin_site_job_save: "site", admin_site_job_del: "site",
+  admin_site_day_hours: "site", admin_site_menus: "site", admin_site_photo: "site", admin_site_photo_reset: "site",   // customer-delete-staff-v1: HIROさん以外は、LINEなし・これからの予約なしの人だけ（下の runAdmin で見る）
 };
 interface Me { owner: boolean; perms: string[]; label: string; staffId: string | null; deviceId?: string | null }
 async function staffOf(sql: Sql, sub: string): Promise<Me | null> {
@@ -246,10 +251,12 @@ export const CONTACT_KINDS: Record<string, string[]> = {
   day: ["見学したい", "利用について相談したい", "ケアマネジャーからの相談", "その他"],
   sekkotsu: ["交通事故のこと", "その他"],
   bodycare: ["メニューのこと", "その他"],
+  apps: ["TASUKARUについて", "導入の相談", "その他"],   // lifeplus-site-cms-v1
   other: ["その他"],
 };
 const BIZ_LABEL: Record<string, string> = {
   day: "デイサービス ココカラプラス", sekkotsu: "もみの木接骨院", bodycare: "HIROボディケアスタジオ", other: "LIFE PLUS",
+  apps: "アプリ開発（TASUKARU）", recruit: "採用",
 };
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 async function ipHash(ip: string): Promise<string | null> {
@@ -261,7 +268,7 @@ async function ipHash(ip: string): Promise<string | null> {
 //  HIROさんが管理画面で6桁の番号を出す → お店の端末でその番号を入れる → 端末に長い合鍵（deviceToken）を渡す。
 //  ★番号も合鍵も、表にはハッシュだけ残す ★通知は受け取れない（LINE が無いので）
 //  ★180日開かなかった端末は使えなくなる ★番号を出し直すと、それまでの端末は使えなくなる
-const DEVICE_PERMS = ["closures", "bookings", "customers", "staff", "settings"];   // device-perms-v2
+const DEVICE_PERMS = ["closures", "bookings", "customers", "staff", "settings", "site"];   // device-perms-v2 / lifeplus-site-cms-v1
 const PAIR_MINUTES = 15;
 const DEVICE_IDLE_DAYS = 180;
 const PAIR_FAILS_PER_IP_HOUR = 10;
@@ -321,9 +328,21 @@ async function handleDevicePair(body: any, deps: Deps, now: Date): Promise<Recor
 async function handleContact(body: any, deps: Deps, now: Date): Promise<Record<string, unknown>> {
   const { sql } = deps;
   const biz = str(body.business, 20);
-  if (!(biz in CONTACT_KINDS)) throw new ApiError("contact_invalid");
-  const kind = str(body.kind, 40);
-  if (!CONTACT_KINDS[biz].includes(kind)) throw new ApiError("contact_kind");
+  let kind = str(body.kind, 40);
+  if (biz === "recruit") {
+    // lifeplus-site-cms-v1: 求人への応募。種類は「募集中の求人の名前」か「求人全般」
+    const jid = str(body.jobId, 40);
+    if (jid) {
+      if (!UUID_RE.test(jid)) throw new ApiError("contact_kind");
+      const j = await sql`select title, employment, business from site_jobs where id = ${jid}::uuid and is_open`;
+      if (!j.length) throw new ApiError("contact_kind");
+      const bz: Record<string, string> = { day: "デイサービス", sekkotsu: "接骨院", bodycare: "ボディケア", company: "会社" };
+      kind = `${bz[j[0].business] ?? ""}／${j[0].title}（${j[0].employment}）`.slice(0, 80);
+    } else kind = "求人全般";
+  } else {
+    if (!(biz in CONTACT_KINDS)) throw new ApiError("contact_invalid");
+    if (!CONTACT_KINDS[biz].includes(kind)) throw new ApiError("contact_kind");
+  }
   // 機械よけ（見えない欄が埋まっている・開いてすぐ送った）：受け付けたふりをして捨てる
   if (str(body.website, 200) || Number(body.elapsed ?? 0) < 3000) return { ok: true };
   const name = str(body.name, 40).normalize("NFKC");
@@ -350,10 +369,222 @@ async function handleContact(body: any, deps: Deps, now: Date): Promise<Record<s
     values (${now.toISOString()}::timestamptz, ${biz}, ${kind}, ${name}, ${org}, ${phone}, ${email}, ${text || null}, ${ih})`;
   const tel = phone ? (phone.length === 11 ? `${phone.slice(0, 3)}-${phone.slice(3, 7)}-${phone.slice(7)}`
     : `${phone.slice(0, 4)}-${phone.slice(4, 6)}-${phone.slice(6)}`) : "";
-  await tellAdmin(deps, `【ホームページからお問い合わせ】${BIZ_LABEL[biz]}\n${kind}\n` +
+  await tellAdmin(deps, (biz === "recruit" ? `【ホームページから採用への応募】\n${kind}\n` : `【ホームページからお問い合わせ】${BIZ_LABEL[biz]}\n${kind}\n`) +
     `${name} 様` + (org ? `（${org}）` : "") + (tel ? `\n電話 ${tel}` : "") + (email ? `\nメール ${email}` : "") +
     (text ? `\n\n${text}` : ""));
   return { ok: true };
+}
+
+// ---------- ホームページの変えられる所・求人  marker: lifeplus-site-cms-v1 ----------
+//  ・だれでも読める（action "site"）：お知らせ・募集中の求人・デイの利用時間・接骨院/ボディケアの受付時間・ボディケアの料金・差し替えた写真
+//  ・書けるのは管理画面の「site」の権限がある人（HIROさん・権限を渡したスタッフ・お店の端末）
+//  ★ボディケアの名前と料金は、予約ページと同じもの（menus）。ここで変えると予約ページも変わる
+//  ★写真は storage の site に置き、表にはその URL だけ残す
+export const SITE_BIZ = ["all", "day", "sekkotsu", "bodycare"];
+export const JOB_BIZ = ["day", "sekkotsu", "bodycare", "company"];
+export const PHOTO_SLOTS: Record<string, string> = {
+  top_hero: "トップの最初の写真",
+  top_day: "トップ：デイサービスの写真", top_kotsu: "トップ：接骨院の写真", top_body: "トップ：ボディケアの写真",
+  day_1: "デイ：写真の列（左）", day_2: "デイ：写真の列（右）",
+  kotsu_1: "接骨院：写真の列（左）", kotsu_2: "接骨院：写真の列（右）",
+  body_1: "ボディケア：写真の列（左）", body_2: "ボディケア：写真の列（中）", body_3: "ボディケア：写真の列（右）",
+  profile: "ボディケア：施術する人",
+};
+const PHOTO_MAX_BYTES = 3 * 1024 * 1024;
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
+function txt(v: unknown, max: number): string | null {
+  const s = str(v, max).normalize("NFKC").replace(/\r\n?/g, "\n");
+  return s ? s : null;
+}
+async function contentOf(sql: Sql): Promise<Record<string, any>> {
+  const rows = await sql`select key, value from site_content`;
+  const m: Record<string, any> = {};
+  for (const r of rows) m[r.key] = r.value;
+  return m;
+}
+// 日付は表の側で文字にしてから受け取る（nd・ud）。時差でずれないように
+function newsRow(n: Record<string, any>) {
+  return { id: n.id, date: String(n.nd), title: n.title, body: n.body ?? "", business: n.business, published: n.published, until: n.ud ? String(n.ud) : "" };
+}
+function jobRow(j: Record<string, any>) {
+  return { id: j.id, business: j.business, title: j.title, employment: j.employment, summary: j.summary ?? "", duties: j.duties ?? "",
+    requirements: j.requirements ?? "", salary: j.salary ?? "", hours: j.hours ?? "", holidays: j.holidays ?? "", benefits: j.benefits ?? "",
+    open: j.is_open, sort: j.sort_order };
+}
+async function bodyMenus(sql: Sql, content: Record<string, any>) {
+  const rows = await sql`select id, name, duration_min, price_yen, sort_order from menus where business_id = 'bodycare' and is_active order by sort_order`;
+  const desc = (content.menu_desc ?? {}) as Record<string, string>;
+  const feat = String(content.menu_featured ?? "");
+  const list = rows.map((m: Record<string, any>) => ({ id: m.id, name: m.name, durationMin: m.duration_min, priceYen: m.price_yen,
+    description: desc[m.id] ?? "", featured: m.id === feat }));
+  // おすすめを先頭に
+  return list.filter((m: any) => m.featured).concat(list.filter((m: any) => !m.featured));
+}
+async function publicHours(sql: Sql) {
+  const r = await sql`select weekday, to_char(open_time,'HH24:MI') as o, to_char(close_time,'HH24:MI') as c
+    from business_hours where kind = 'public' order by weekday, open_time`;
+  return r.map((h: Record<string, any>) => ({ weekday: Number(h.weekday), open: h.o, close: h.c === "00:00" ? "24:00" : h.c }));
+}
+// だれでも読める
+async function siteOut(sql: Sql, now: Date) {
+  const today = jstDate(now);
+  const c = await contentOf(sql);
+  const news = await sql`select *, news_date::text as nd, until_date::text as ud from site_news where published and news_date <= ${today}::date
+    and (until_date is null or until_date >= ${today}::date) order by news_date desc, created_at desc limit 20`;
+  const jobs = await sql`select * from site_jobs where is_open order by sort_order, created_at`;
+  return {
+    news: news.map(newsRow).map((n: any) => ({ date: n.date, title: n.title, body: n.body, business: n.business })),
+    jobs: jobs.map(jobRow).map((j: any) => { const { open: _o, sort: _s, ...rest } = j; return rest; }),
+    dayHours: c.day_hours ?? null,
+    rsvHours: await publicHours(sql),
+    menus: (await bodyMenus(sql, c)).map((m: any) => ({ name: m.name, durationMin: m.durationMin, priceYen: m.priceYen, description: m.description, featured: m.featured })),
+    photos: c.photos ?? {},
+  };
+}
+// deno-lint-ignore no-explicit-any
+async function handleSiteAdmin(body: any, deps: Deps, me: Me, now: Date): Promise<Record<string, unknown>> {
+  const { sql } = deps;
+  const by = me.owner ? "HIRO" : me.label;
+  const putContent = async (key: string, value: unknown) => {
+    await sql`insert into site_content (key, value, updated_at, updated_by) values (${key}, ${sql.json(value)}, ${now.toISOString()}::timestamptz, ${by})
+      on conflict (key) do update set value = excluded.value, updated_at = excluded.updated_at, updated_by = excluded.updated_by`;
+  };
+  switch (body.action) {
+    case "admin_site": {
+      const c = await contentOf(sql);
+      const news = await sql`select *, news_date::text as nd, until_date::text as ud from site_news order by news_date desc, created_at desc limit 100`;
+      const jobs = await sql`select * from site_jobs order by sort_order, created_at`;
+      return { news: news.map(newsRow), jobs: jobs.map(jobRow), dayHours: c.day_hours ?? {}, menus: await bodyMenus(sql, c),
+        photos: c.photos ?? {}, slots: PHOTO_SLOTS, today: jstDate(now) };
+    }
+    case "admin_site_news_save": {
+      const id = str(body.id, 40);
+      const date = str(body.date, 10), until = str(body.until, 10);
+      if (!YMD_RE.test(date) || (until && !YMD_RE.test(until))) throw new ApiError("site_date_invalid");
+      const title = txt(body.title, 60);
+      if (!title) throw new ApiError("site_title_required");
+      const biz = SITE_BIZ.includes(String(body.business)) ? String(body.business) : "all";
+      const b = txt(body.body, 600), pub = body.published !== false;
+      if (id) {
+        if (!UUID_RE.test(id)) throw new ApiError("bad_request");
+        const r = await sql`update site_news set news_date = ${date}::date, title = ${title}, body = ${b}, business = ${biz}, published = ${pub},
+          until_date = ${until || null}::date, updated_at = ${now.toISOString()}::timestamptz where id = ${id}::uuid returning id`;
+        if (!r.length) throw new ApiError("site_not_found", 404);
+        return { ok: true, id };
+      }
+      const r = await sql`insert into site_news (news_date, title, body, business, published, until_date)
+        values (${date}::date, ${title}, ${b}, ${biz}, ${pub}, ${until || null}::date) returning id`;
+      return { ok: true, id: r[0].id };
+    }
+    case "admin_site_news_del": {
+      const id = str(body.id, 40);
+      if (!UUID_RE.test(id)) throw new ApiError("bad_request");
+      await sql`delete from site_news where id = ${id}::uuid`;
+      return { ok: true };
+    }
+    case "admin_site_job_save": {
+      const id = str(body.id, 40);
+      const biz = String(body.business);
+      if (!JOB_BIZ.includes(biz)) throw new ApiError("site_job_business");
+      const title = txt(body.title, 40), emp = txt(body.employment, 30);
+      if (!title || !emp) throw new ApiError("site_title_required");
+      const f = {
+        summary: txt(body.summary, 200), duties: txt(body.duties, 1000), requirements: txt(body.requirements, 600),
+        salary: txt(body.salary, 300), hours: txt(body.hours, 300), holidays: txt(body.holidays, 300), benefits: txt(body.benefits, 600),
+      };
+      const open = body.open !== false;
+      const sort = Number.isInteger(Number(body.sort)) ? Math.max(0, Math.min(999, Number(body.sort))) : 0;
+      if (id) {
+        if (!UUID_RE.test(id)) throw new ApiError("bad_request");
+        const r = await sql`update site_jobs set business = ${biz}, title = ${title}, employment = ${emp}, summary = ${f.summary}, duties = ${f.duties},
+          requirements = ${f.requirements}, salary = ${f.salary}, hours = ${f.hours}, holidays = ${f.holidays}, benefits = ${f.benefits},
+          is_open = ${open}, sort_order = ${sort}, updated_at = ${now.toISOString()}::timestamptz where id = ${id}::uuid returning id`;
+        if (!r.length) throw new ApiError("site_not_found", 404);
+        return { ok: true, id };
+      }
+      const r = await sql`insert into site_jobs (business, title, employment, summary, duties, requirements, salary, hours, holidays, benefits, is_open, sort_order)
+        values (${biz}, ${title}, ${emp}, ${f.summary}, ${f.duties}, ${f.requirements}, ${f.salary}, ${f.hours}, ${f.holidays}, ${f.benefits}, ${open}, ${sort}) returning id`;
+      return { ok: true, id: r[0].id };
+    }
+    case "admin_site_job_del": {
+      const id = str(body.id, 40);
+      if (!UUID_RE.test(id)) throw new ApiError("bad_request");
+      await sql`delete from site_jobs where id = ${id}::uuid`;
+      return { ok: true };
+    }
+    case "admin_site_day_hours": {
+      const h = body.dayHours ?? {};
+      const v = { am: txt(h.am, 40) ?? "", pm: txt(h.pm, 40) ?? "", sun: txt(h.sun, 40) ?? "", days: txt(h.days, 80) ?? "" };
+      if (!v.am && !v.pm && !v.sun) throw new ApiError("site_hours_required");
+      await putContent("day_hours", v);
+      return { ok: true, dayHours: v };
+    }
+    case "admin_site_menus": {
+      const list = Array.isArray(body.menus) ? body.menus : null;
+      if (!list || list.length > 20) throw new ApiError("bad_request");
+      const c = await contentOf(sql);
+      const desc: Record<string, string> = { ...(c.menu_desc ?? {}) };
+      const cur = await sql`select id from menus where business_id = 'bodycare'`;
+      const ids = new Set(cur.map((r: any) => String(r.id)));
+      let featured = String(c.menu_featured ?? "");
+      await sql.begin(async (tx: Sql) => {
+        for (const m of list) {
+          const id = String(m && m.id);
+          if (!ids.has(id)) throw new ApiError("site_not_found", 404);
+          const name = txt(m.name, 30);
+          const price = Number(m.priceYen);
+          if (!name) throw new ApiError("site_title_required");
+          if (!Number.isInteger(price) || price < 0 || price > 1000000) throw new ApiError("site_price_invalid");
+          await tx`update menus set name = ${name}, price_yen = ${price} where id = ${id}::uuid and business_id = 'bodycare'`;
+          const d = txt(m.description, 200);
+          if (d) desc[id] = d; else delete desc[id];
+          if (m.featured) featured = id;
+        }
+      }).catch((e: unknown) => {
+        if (e instanceof ApiError) throw e;
+        if (String((e as Error).message).includes("menus_business_id_name_key") || String((e as Error).message).includes("unique")) throw new ApiError("site_menu_dup", 409);
+        throw e;
+      });
+      await putContent("menu_desc", desc);
+      await putContent("menu_featured", featured);
+      return { ok: true, menus: await bodyMenus(sql, await contentOf(sql)) };
+    }
+    case "admin_site_photo": {
+      const slot = str(body.slot, 20);
+      if (!(slot in PHOTO_SLOTS)) throw new ApiError("site_photo_slot");
+      const type = str(body.type, 20);
+      const ext = type === "image/jpeg" ? "jpg" : type === "image/png" ? "png" : type === "image/webp" ? "webp" : "";
+      if (!ext) throw new ApiError("site_photo_type");
+      let bytes: Uint8Array;
+      try {
+        const b64 = str(body.data, 6000000).replace(/^data:[^,]*,/, "");
+        const bin = atob(b64);
+        bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      } catch { throw new ApiError("site_photo_type"); }
+      if (!bytes.length || bytes.length > PHOTO_MAX_BYTES) throw new ApiError("site_photo_size");
+      // 中身が本当に写真か（先頭の印で確かめる）
+      const isJpg = bytes[0] === 0xff && bytes[1] === 0xd8, isPng = bytes[0] === 0x89 && bytes[1] === 0x50,
+        isWebp = bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
+      if (!(ext === "jpg" ? isJpg : ext === "png" ? isPng : isWebp)) throw new ApiError("site_photo_type");
+      if (!deps.putImage) throw new ApiError("server_error", 500);
+      const url = await deps.putImage(`photos/${slot}-${now.getTime()}.${ext}`, bytes, type);
+      const c = await contentOf(sql);
+      const photos = { ...(c.photos ?? {}), [slot]: url };
+      await putContent("photos", photos);
+      return { ok: true, photos };
+    }
+    case "admin_site_photo_reset": {
+      const slot = str(body.slot, 20);
+      if (!(slot in PHOTO_SLOTS)) throw new ApiError("site_photo_slot");
+      const c = await contentOf(sql);
+      const photos = { ...(c.photos ?? {}) };
+      delete photos[slot];
+      await putContent("photos", photos);
+      return { ok: true, photos };
+    }
+  }
+  throw new ApiError("bad_request");
 }
 
 // 管理画面の操作（LINE の人も、お店の端末も、ここを通る）
@@ -380,6 +611,7 @@ async function runAdmin(me: Me, body: any, deps: Deps, now: Date): Promise<Recor
       and starts_at > ${now.toISOString()}::timestamptz limit 1`;
     if (live.length) throw new ApiError("customer_has_booking", 409);
   }
+  if (String(body.action).startsWith("admin_site")) return await handleSiteAdmin(body, deps, me, now);   // lifeplus-site-cms-v1
   const out = await handleAdmin(body, deps, now);
   if (body.action === "admin_init") out.me = { owner: me.owner, perms: me.perms, label: me.label, device: !!me.deviceId };
   return out;
@@ -394,6 +626,8 @@ export async function handle(body: any, deps: Deps): Promise<Record<string, unkn
 
   // site-contact-v1: ホームページのお問い合わせ（LINE のログインは要らない）
   if (body.action === "contact") return await handleContact(body, deps, now);
+  // lifeplus-site-cms-v1: ホームページの変えられる所（だれでも読める）
+  if (body.action === "site") return await siteOut(sql, now);
 
   // admin-device-v1: お店の端末（LINE のログインは要らない）
   if (body.action === "device_pair") return await handleDevicePair(body, deps, now);
@@ -1180,6 +1414,19 @@ if (DenoRT && DenoRT.env?.get("SUPABASE_DB_URL")) {
     }
   };
 
+  // lifeplus-site-cms-v1: ホームページの写真を storage（site）に置く。鍵は Supabase が用意する環境変数から
+  const SB_URL = DenoRT.env.get("SUPABASE_URL") ?? "";
+  const SB_KEY = DenoRT.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const putImage = async (path: string, bytes: Uint8Array, type: string) => {
+    const r = await fetch(`${SB_URL}/storage/v1/object/site/${path}`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${SB_KEY}`, apikey: SB_KEY, "content-type": type, "cache-control": "31536000", "x-upsert": "true" },
+      body: bytes,
+    });
+    if (!r.ok) { console.error("storage", r.status, await r.text()); throw new ApiError("site_photo_upload", 502); }
+    return `${SB_URL}/storage/v1/object/public/site/${path}`;
+  };
+
   const cors = {
     "access-control-allow-origin": "*",
     "access-control-allow-headers": "content-type, authorization, apikey, x-client-info",
@@ -1197,7 +1444,7 @@ if (DenoRT && DenoRT.env?.get("SUPABASE_DB_URL")) {
     }
     try {
       const clientIp = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || (req.headers.get("x-real-ip") ?? "");
-      const out = await handle(body, { sql, verifyIdToken, notify, clientIp });   // site-contact-v1
+      const out = await handle(body, { sql, verifyIdToken, notify, clientIp, putImage });   // site-contact-v1 / lifeplus-site-cms-v1
       return Response.json(out, { headers: cors });
     } catch (e) {
       if (e instanceof ApiError) return Response.json({ error: e.code }, { status: e.status, headers: cors });

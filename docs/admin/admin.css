@@ -256,3 +256,19 @@ main { padding-bottom: 90px; }
 .bar { padding-left: max(16px, calc((100% - var(--col)) / 2 + 14px)); padding-right: max(16px, calc((100% - var(--col)) / 2 + 14px)); }
 .tabs { padding-left: max(0px, calc((100% - var(--col)) / 2)); padding-right: max(0px, calc((100% - var(--col)) / 2)); }
 .fab { right: max(18px, calc((100vw - var(--col)) / 2 + 18px)); }
+/* ---------- ホームページ（lifeplus-site-cms-v1）---------- */
+.tabs button { min-width: 0; }
+@media (max-width: 400px) { .tabs button { font-size: 11px; } .tabs svg { width: 20px; height: 20px; } }
+.site-item { display: block; width: 100%; text-align: left; border: 0; font: inherit; color: inherit; cursor: pointer; }
+.si-top { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 4px; font-size: 12.5px; }
+.si-date { font-weight: 700; color: var(--mute); }
+.si-tag { background: var(--bg); border-radius: 999px; padding: 1px 8px; color: var(--mute); }
+.si-st { margin-left: auto; border-radius: 999px; padding: 1px 8px; background: #eef0f4; color: var(--mute); font-weight: 700; }
+.si-st.on { background: var(--mint); color: #fff; }
+.si-title { font-size: 16px; }
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.photo-slot { display: flex; flex-direction: column; margin: 0; }
+.photo-slot img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; background: var(--bg); margin-bottom: 8px; }
+.photo-slot b { font-size: 13.5px; line-height: 1.4; }
+.pick { text-align: center; cursor: pointer; display: block; }
+.pick.busy { opacity: .5; pointer-events: none; }
