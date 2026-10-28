@@ -1034,3 +1034,6 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
 /* ---------- 私たちのこと：心身一如（lifeplus-about-v2）---------- */
 .ss-word { font-family: var(--head); font-weight: 900; font-size: clamp(40px, 5.4vw, 68px); line-height: 1.5; letter-spacing: .12em; margin: 0 0 18px; color: var(--ink); }
 .ss-word ruby rt { font-size: .26em; font-weight: 700; letter-spacing: .3em; color: var(--green-ink); }
+
+/* ---------- フッターを会社情報だけに（lifeplus-foot-trim-v1）---------- */
+.site-foot .wrap { grid-template-columns: minmax(0, 1fr); }
