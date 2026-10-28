@@ -520,3 +520,7 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   .comic-panel.p2 { width: 86%; }
   .comic-panel { border-width: 5px; box-shadow: 7px 7px 0 #111; }
 }
+
+/* ---------- 現場から生まれたソフト（lifeplus-story-v1）---------- */
+.story-key { font-family: var(--head); font-weight: 700; font-size: clamp(20px, 2.2vw, 26px); line-height: 1.7; color: var(--navy-ink);
+  border-left: 5px solid var(--orange); padding: 4px 0 4px 18px; margin: 28px 0; }
