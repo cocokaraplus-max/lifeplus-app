@@ -1025,3 +1025,8 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   .svc .more { font-size: 0; gap: 0; }
   .svc .more::after { width: 34px; height: 34px; }
 }
+
+/* ---------- アクセスの建物の絵を小さく、住所の右へ（lifeplus-bldg-small-v1）---------- */
+.bldg.bldg-sm { float: right; width: 180px; max-width: 42%; margin: 4px 0 14px 18px; border-radius: 14px; box-shadow: 0 10px 22px -16px rgba(35,38,43,.5); }
+.access .bldg-clear { clear: both; }
+@media (max-width: 860px) { .bldg.bldg-sm { width: 120px; max-width: 38%; margin: 2px 0 10px 14px; border-radius: 12px; } }
