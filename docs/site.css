@@ -747,3 +747,14 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   .oneday-item p { font-size: 14px; line-height: 1.7; }
   .feature > div > .feat-ph { max-width: none; border-radius: 18px 18px 18px 56px; }
 }
+
+/* ---------- デイの写真を小さめに（lifeplus-day-photo-size-v1）---------- */
+.season-ph figure:first-child, .season-ph.empty { aspect-ratio: 16 / 9; }
+.oneday-grid { max-width: 960px; }
+.oneday-item figure { aspect-ratio: 1; }
+.feature > div > .feat-ph { max-width: 320px; }
+.oneday .oneday-lead { font-size: 17px; line-height: 1.9; letter-spacing: .01em; }
+@media (max-width: 760px) {
+  .oneday-item figure { flex: 0 0 32%; aspect-ratio: 1; }
+  .feature > div > .feat-ph { max-width: 260px; }
+}
