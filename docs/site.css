@@ -1206,3 +1206,24 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   .flow-ex.fx2 li:nth-child(odd)::before { background: var(--orange); box-shadow: 0 0 0 4px var(--orange-soft); }
   .flow-ex.fx2 li:nth-child(even)::before { background: var(--green); box-shadow: 0 0 0 4px var(--green-soft); }
 }
+
+/* ---------- 1日の流れに日曜の1日型を足す（lifeplus-day-flow-sun-v1）---------- */
+.flow .sun { display: none; }
+.flow-min, .fb-line i { display: none; }
+#flow-sun:checked ~ .wk { display: none; }
+#flow-sun:checked ~ .flow-bar.sun { display: block; }
+#flow-sun:checked ~ .flow-list.sun { display: block; }
+#flow-sun:checked ~ .flow-tabs label[for="flow-sun"] {
+  color: #fff; background: linear-gradient(135deg, #f7b733, #a7cf3c 55%, var(--green)); box-shadow: 0 8px 18px -10px rgba(110,185,44,.8); }
+#flow-sun:focus-visible ~ .flow-tabs label[for="flow-sun"] { outline: 3px solid var(--orange); outline-offset: 2px; }
+.flow-step.sg .flow-dot { border-color: var(--green); }
+.flow-step.sg .flow-dot::after { background: var(--green); }
+.flow-step.sg .flow-ic { background: var(--green-soft); color: var(--green-ink); }
+@media (max-width: 760px) {
+  .flow-tabs label { padding: 9px 4px 8px; }
+  .flow-tabs b { font-size: 14.5px; white-space: nowrap; }
+  .flow-tabs span { font-size: 11px; white-space: nowrap; }
+  .flow-bar.sun .fb-line i { display: none; }
+  .flow-bar.sun .fb-line > span { font-size: 11px; }
+}
+@media (max-width: 380px) { .flow-tabs b { font-size: 13.5px; } .flow-tabs span { font-size: 10.5px; letter-spacing: 0; } }
