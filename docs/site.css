@@ -714,3 +714,12 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   .season-tx h3 { font-size: 17px; margin-top: 12px; }
   .season-tx p { font-size: 13px; line-height: 1.7; }
 }
+
+/* ---------- トップの「＋」を回す（lifeplus-hero-spin-v1）----------
+   開いたすぐに2回転、その後は4.5秒ごとに1回転。落ちてくる動き（drop）とは別の rotate で回す */
+@media (prefers-reduced-motion: no-preference) {
+  .hero-photo .mk { animation: drop 900ms cubic-bezier(.2,.8,.2,1.05) both 450ms,
+      lpSpinIn 1600ms cubic-bezier(.25,.7,.2,1) 450ms both, lpSpin 4.5s ease-in-out 3.5s infinite; }
+}
+@keyframes lpSpinIn { from { rotate: -720deg; } to { rotate: 0deg; } }
+@keyframes lpSpin { 0% { rotate: 0deg; } 24% { rotate: 360deg; } 100% { rotate: 360deg; } }
