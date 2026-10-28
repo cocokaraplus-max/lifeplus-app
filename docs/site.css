@@ -960,3 +960,26 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
 
 /* ---------- 季節の行事の写真を正方形に（lifeplus-season-square-v1）---------- */
 .season-ph figure:first-child, .season-ph.empty { aspect-ratio: 1; }
+
+/* ---------- デイサービスもポラロイド風に（lifeplus-day-polaroid-v1）---------- */
+.photos.polaroid figure.wide, .photos.polaroid figure.wide + figure { width: min(290px, 28%); }
+.photos.polaroid figure.wide img { aspect-ratio: 4 / 3; }
+.c-day .photos.polaroid figure::after { color: var(--orange-ink); }
+.c-day .photos.polaroid figure::before { background: rgba(255,243,223,.85); }
+.photos.polaroid img.pos-top { object-position: 50% 30%; }
+/* 木の壁は写真の段だけに（下に Instagram の札がある時も白い地のまま） */
+.photos-band:has(.photos.polaroid) { background: none; box-shadow: none; padding: 0 0 clamp(14px, 2vw, 24px); }
+.photos.polaroid { position: relative; isolation: isolate; padding-top: clamp(40px, 5vw, 60px); padding-bottom: clamp(44px, 5vw, 64px); }
+.photos.polaroid::before { content: ""; position: absolute; top: 0; bottom: 0; left: calc(50% - 50vw); right: calc(50% - 50vw); z-index: -1;
+  background-color: #c9a27a;
+  background-image:
+    linear-gradient(180deg, rgba(255,255,255,.10), rgba(0,0,0,.10)),
+    repeating-linear-gradient(90deg, rgba(60,35,15,.30) 0 2px, rgba(255,255,255,.18) 2px 3px, transparent 3px 118px),
+    repeating-linear-gradient(90deg, transparent 0 9px, rgba(90,55,25,.07) 9px 11px, transparent 11px 23px, rgba(255,240,220,.06) 23px 26px, transparent 26px 41px),
+    repeating-linear-gradient(90deg, transparent 0 37px, rgba(80,45,20,.10) 37px 38px, transparent 38px 61px, rgba(80,45,20,.06) 61px 63px, transparent 63px 97px, rgba(255,235,210,.08) 97px 99px, transparent 99px 118px),
+    radial-gradient(ellipse 14px 60px at 30% 40%, rgba(90,55,25,.16), transparent 70%),
+    radial-gradient(ellipse 10px 44px at 72% 70%, rgba(90,55,25,.13), transparent 70%),
+    repeating-linear-gradient(90deg, #d1a97f 0 118px, #c19669 118px 236px, #d8b38b 236px 354px, #bb8f63 354px 472px, #cca47a 472px 590px, #c49b70 590px 708px, #d3ad84 708px 826px);
+  box-shadow: inset 0 10px 18px -12px rgba(40,25,10,.45), inset 0 -10px 18px -12px rgba(40,25,10,.35); }
+.c-day .insta { margin-top: clamp(22px, 3vw, 34px); }
+@media (max-width: 560px) { .photos.polaroid { padding-top: 30px; padding-bottom: 34px; } }
