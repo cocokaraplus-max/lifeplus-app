@@ -428,3 +428,35 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   .hero-photo.wide > img:first-child { border-radius: 22px 22px 22px 76px; }
   .hero-photo.wide .mk { width: 22%; left: auto; right: -3%; top: auto; bottom: -9%; }
 }
+
+/* ---------- アプリ開発・プライバシーポリシー（lifeplus-apps-v1）---------- */
+:root { --navy: #2c5a86; --navy-ink: #1f3f60; --navy-soft: #eaf1f8; }
+.c-app { --c: var(--navy); --ci: var(--navy-ink); --cs: var(--navy-soft); }
+.app-band { background: var(--navy-ink); color: #fff; }
+.app-band-in { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: clamp(28px, 5vw, 72px); align-items: center; }
+.app-band .en { color: #9cc3e6; font-size: 15px; display: flex; align-items: center; gap: 10px; margin: 0 0 14px; }
+.app-band .en::before { content: ""; width: 28px; height: 2px; background: currentColor; }
+.app-band h2 { font-size: clamp(28px, 3.6vw, 44px); margin-bottom: 20px; }
+.app-band p { color: #d6e2ee; max-width: 32em; }
+.btn.light { background: #fff; color: var(--navy-ink); margin-top: 8px; }
+.btn.light:hover { background: var(--navy-soft); }
+.app-card { aspect-ratio: 4 / 3; border-radius: 28px 28px 28px 96px; background: linear-gradient(140deg, #3b74a8, #1b3653);
+  display: grid; place-content: center; text-align: center; gap: 4px; box-shadow: 0 24px 60px rgba(0, 0, 0, .25); }
+.app-card .en { display: block; margin: 0; font-size: clamp(34px, 4.4vw, 56px); font-weight: 300; letter-spacing: .06em; color: #fff; }
+.app-card .en::before { display: none; }
+.app-card b { font-family: var(--head); font-size: 20px; letter-spacing: .3em; }
+.app-card small { color: #b9d0e6; font-size: 14px; margin-top: 6px; }
+.reach { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.mail { font-family: var(--en); font-size: clamp(20px, 2.2vw, 26px); font-weight: 500; color: var(--navy-ink); text-decoration: none; word-break: break-all; }
+.mail:hover { text-decoration: underline; }
+.site-foot .copy { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
+.policy { max-width: 860px; }
+.policy h2 { font-size: 21px; margin: 40px 0 12px; color: var(--navy-ink); }
+.policy h2:first-child { margin-top: 0; }
+.policy ul { padding-left: 1.3em; margin: 0 0 1em; }
+.policy li { margin-bottom: 6px; }
+@media (max-width: 760px) {
+  .app-band-in { grid-template-columns: 1fr; }
+  .app-card { order: -1; aspect-ratio: 16 / 9; border-radius: 22px 22px 22px 64px; }
+  .app-band .btn { width: 100%; }
+}
