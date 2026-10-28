@@ -1037,3 +1037,10 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
 
 /* ---------- フッターを会社情報だけに（lifeplus-foot-trim-v1）---------- */
 .site-foot .wrap { grid-template-columns: minmax(0, 1fr); }
+
+/* ---------- フッターの Services・Contact はパソコンだけ（lifeplus-foot-pc-v1）---------- */
+.site-foot .wrap { grid-template-columns: minmax(0, 1.2fr) repeat(2, minmax(0, 1fr)); }
+@media (max-width: 760px) {
+  .site-foot .wrap { grid-template-columns: minmax(0, 1fr); }
+  .site-foot .foot-pc { display: none; }
+}
