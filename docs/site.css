@@ -998,3 +998,14 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
 .photos.polaroid:not(:has(figure:nth-child(3))) figure { width: min(250px, 40%); }
 .c-kotsu .photos.polaroid figure::after { color: var(--green-ink); }
 .c-kotsu .photos.polaroid figure::before { background: rgba(238,247,228,.88); }
+
+/* ---------- 小さな写真＋説明文の札（lifeplus-kotsu-fig-v1）---------- */
+.fig.fig-mini { display: flex; align-items: center; gap: 18px; max-width: 560px; margin-top: 28px; padding: 14px 20px 14px 14px;
+  background: var(--cs, var(--green-soft)); border-radius: 22px 22px 22px 8px; }
+.fig.fig-mini img { width: 128px; height: 128px; flex: none; object-fit: cover; border-radius: 16px; box-shadow: 0 10px 22px -14px rgba(35,38,43,.55); }
+.fig.fig-mini figcaption { margin: 0; font-size: 14px; line-height: 1.8; color: var(--ci, var(--green-ink)); }
+@media (max-width: 560px) {
+  .fig.fig-mini { gap: 14px; padding: 12px 14px 12px 12px; }
+  .fig.fig-mini img { width: 92px; height: 92px; border-radius: 12px; }
+  .fig.fig-mini figcaption { font-size: 13px; }
+}
