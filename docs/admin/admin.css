@@ -294,3 +294,12 @@ main { padding-bottom: 90px; }
 .ntc-chips { margin-top: -2px; }
 .two > * { min-width: 0; }
 .two .f input[type="date"] { min-width: 0; max-width: 100%; }
+
+/* ---------- 臨時の受付日  marker: lifeplus-extra-hours-v1 ---------- */
+.cal-d.extra { background: var(--mint-soft); color: var(--mint-ink, #065f46); border-color: var(--mint); }
+.cal-d.extra i { color: var(--mint-ink, #065f46); }
+button.cal-d.none { cursor: pointer; }
+button.cal-d.none:hover { background: #f3f5f9; }
+.sw.ex { background: var(--mint-soft); border: 2px solid var(--mint); }
+.note.warn { color: #9a5b00; background: #fff7e6; border-radius: 8px; padding: 6px 10px; }
+.cal-d.none i { color: #9aa3b5; font-weight: 700; }

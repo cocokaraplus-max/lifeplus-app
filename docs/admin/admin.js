@@ -42,6 +42,8 @@
     booking_not_found: "この予約は見つかりませんでした。",
     customer_not_found: "このお客さまは見つかりませんでした。",
     closure_not_found: "この休みは見つかりませんでした。もう外されているかもしれません。",   // lifeplus-closure-notice-v1
+    extra_overlap: "この日は、その時間にもう臨時の受付が入っています。",   // lifeplus-extra-hours-v1
+    extra_not_found: "この臨時の受付は見つかりませんでした。もう外されているかもしれません。",
     slot_not_available: "その時間はもう埋まっています。別の時間を選んでください。",
     customer_blocked: "ブロック中のお客さまです。先にブロックを外してください。",
     name_required: "お名前を入れてください。",
@@ -115,12 +117,21 @@
   // lifeplus-hours-kind-v1: hoursOf＝お客さまに見せる受付時間、staffHoursOf＝手入力だけの時間
   function hoursOf(ymd) {
     var w = wdOf(ymd) === 0 ? 7 : wdOf(ymd);
-    return (A.init.hours || []).filter(function (h) { return h.weekday === w && (h.kind || "public") === "public"; });
+    return (A.init.hours || []).filter(function (h) { return h.weekday === w && (h.kind || "public") === "public"; })
+      .concat(extrasOn(ymd).filter(function (x) { return x.kind === "public"; }));   // lifeplus-extra-hours-v1
   }
   function staffHoursOf(ymd) {
     var w = wdOf(ymd) === 0 ? 7 : wdOf(ymd);
-    return (A.init.hours || []).filter(function (h) { return h.weekday === w && h.kind === "staff"; });
+    return (A.init.hours || []).filter(function (h) { return h.weekday === w && h.kind === "staff"; })
+      .concat(extrasOn(ymd).filter(function (x) { return x.kind === "staff"; }));   // lifeplus-extra-hours-v1
   }
+  // lifeplus-extra-hours-v1: 臨時の受付日（いつもは受付のない日に、その日だけ足した受付時間）
+  function extrasOn(ymd) { return (A.init.extras || []).filter(function (x) { return x.date === ymd; }); }
+  function weeklyHoursOf(ymd) {
+    var w = wdOf(ymd) === 0 ? 7 : wdOf(ymd);
+    return (A.init.hours || []).filter(function (h) { return h.weekday === w; });
+  }
+  function refreshExtras() { return api("admin_init").then(function (d) { A.init.extras = d.extras; }); }
   // できること（HIROさんは全部）
   function can(p) { var me = A.init && A.init.me; return !!me && (me.owner || me.perms.indexOf(p) >= 0); }
   function owner() { return !!(A.init && A.init.me && A.init.me.owner); }
@@ -420,12 +431,12 @@
     };
   }
   // 休みと重なった予約があれば知らせる
-  function afterClosure(r) {
+  function afterClosure(r, what) {
     var cs = (r && r.conflicts) || [];
     if (!cs.length) return;
     setTimeout(function () {
       openSheet("<h3>重なる予約があります</h3>" +
-        '<p class="note">休みにした時間に、次の予約が入っています。予約は自動では取り消されません。予約票から連絡・取り消しをしてください。</p>' +
+        '<p class="note">' + (what || "休みにした時間") + 'に、次の予約が入っています。予約は自動では取り消されません。予約票から連絡・取り消しをしてください。</p>' +
         cs.map(cardOf).join(""));
       on("[data-bk]", function (el) { slip(el.getAttribute("data-bk"), cs); }, $sb);
     }, 50);
@@ -615,15 +626,24 @@
       var hasH = hoursOf(ymd).length > 0, cs = closuresOn(ymd), past = ymd < A.init.today;
       var whole = cs.some(function (c) { return wholeDay(c, ymd); });
       var cls = !hasH ? "none" : whole ? "closed" : cs.length ? "part" : "open";
-      var mark = !hasH ? "" : whole ? "休" : cs.length ? "一部" : "";
-      var noticed = cs.some(function (c) { return c.notice; });
+      var ex = extrasOn(ymd).length > 0;   // lifeplus-extra-hours-v1
+      var mark = !hasH ? (whole ? "休" : ex ? "臨時" : "") : whole ? "休" : cs.length ? "一部" : ex ? "臨時" : "";
+      if (ex && !whole) cls += " extra";
+      var noticed = cs.some(function (c) { return c.notice; }) || extrasOn(ymd).some(function (x) { return x.notice; });
       if (pk && !past) h += '<button class="cal-d ' + cls + (pk.start === ymd ? " sel" : "") + (noticed ? " ntc" : "") + '" data-pick="' + ymd + '" aria-label="' + dayText(ymd) + (mark ? " " + mark : "") + '">' + dd + "<i>" + mark + "</i></button>";
-      else if (past || !hasH) h += '<span class="cal-d ' + (past ? "none" : cls) + '">' + dd + "</span>";
+      else if (past) h += '<span class="cal-d none">' + dd + "</span>";
+      else if (!hasH) h += '<button class="cal-d ' + cls + (ymd === A.init.today ? " today" : "") + (noticed ? " ntc" : "") + '" data-none="' + ymd + '" aria-label="' + dayText(ymd) + " 受付のない日" + (mark ? " " + mark : "") + '">' + dd + "<i>" + mark + "</i></button>";   // lifeplus-extra-hours-v1: 受付のない日も押せる
       else h += '<button class="cal-d ' + cls + (ymd === A.init.today ? " today" : "") + (noticed ? " ntc" : "") + '" data-off="' + ymd + '" aria-label="' + dayText(ymd) + (mark ? " " + mark : "") + '">' + dd + "<i>" + mark + "</i></button>";
     }
-    h += '</div><div class="legend" style="margin-top:8px"><span><i class="sw" style="background:var(--blue-soft)"></i>受付日</span><span><i class="sw x"></i>休み</span><span><i class="sw" style="background:var(--amber-soft)"></i>一部休み</span><span><b class="ntc-dot"></b>お知らせあり</span></div>' +
-      '<p class="note">受付日を押すと、その日を休みにできます。時間だけ休むこともできます。何日も続けて休むときは「期間で休みを入れる」から。</p></div>';
+    h += '</div><div class="legend" style="margin-top:8px"><span><i class="sw" style="background:var(--blue-soft)"></i>受付日</span><span><i class="sw x"></i>休み</span><span><i class="sw" style="background:var(--amber-soft)"></i>一部休み</span><span><i class="sw ex"></i>臨時の受付</span><span><b class="ntc-dot"></b>お知らせあり</span></div>' +
+      '<p class="note">受付日を押すと、その日を休みにできます。時間だけ休むこともできます。受付のない日を押すと、臨時で受付にできます。何日も続けて休むときは「期間で休みを入れる」から。</p></div>';
 
+    var exs = (A.init.extras || []).filter(function (x) { return x.date >= A.init.today; });   // lifeplus-extra-hours-v1
+    if (exs.length) h += '<h2>臨時の受付日</h2><div class="card offl">' + exs.map(function (x) {
+      return '<div class="oi"><div class="oi-m"><b>' + esc(dayText(x.date)) + "</b><span>" + esc(x.open + "〜" + x.close) + (x.kind === "staff" ? "　手入力だけ" : "") + (x.note ? "　" + esc(x.note) : "") + "</span>" +
+        (x.notice ? '<em class="oi-ntc">お知らせ：' + esc(x.notice) + "</em>" : "") + "</div>" +
+        '<button class="link red" data-xdel="' + esc(x.id) + '">外す</button></div>';
+    }).join("") + "</div>";
     h += "<h2>これからの休み</h2>";
     h += A.closures.length ? '<div class="card offl">' + A.closures.map(function (c) {
       var range = c.date === c.endDate ? dayText(c.date) : mds(c.date) + "〜" + mds(c.endDate);
@@ -647,6 +667,13 @@
       rangeForm(a, b);
     });
     on("[data-off]", function (el) { offForm(el.getAttribute("data-off")); });
+    on("[data-none]", function (el) { noneForm(el.getAttribute("data-none")); });   // lifeplus-extra-hours-v1
+    on("[data-xdel]", function (el) {
+      var x = (A.init.extras || []).filter(function (v) { return v.id === el.getAttribute("data-xdel"); })[0];
+      confirmSheet("この臨時の受付を外しますか？", dayText(x.date) + " " + x.open + "〜" + x.close + " は、予約を受けられなくなります。", "外す", function () {
+        return api("admin_extra_del", { id: x.id }).then(function (r) { closeSheet(); toast("臨時の受付を外しました"); return refreshExtras().then(function () { showOff(); afterClosure(r, "外した臨時の受付の時間"); }); });
+      });
+    });
     on("[data-ntc]", function (el) { noticeForm(A.closures.filter(function (x) { return x.id === el.getAttribute("data-ntc"); })[0]); });
     on("[data-del]", function (el) {
       var c = A.closures.filter(function (x) { return x.id === el.getAttribute("data-del"); })[0];
@@ -690,6 +717,47 @@
       }, fail);
     };
   }
+  // lifeplus-extra-hours-v1: 受付のない日を押したとき
+  function noneForm(ymd) {
+    var cs = closuresOn(ymd), ex = extrasOn(ymd);
+    openSheet("<h3>" + esc(dayText(ymd)) + "</h3>" +
+      '<p class="note">' + (ex.length ? "この日は臨時の受付が入っています：" + ex.map(function (x) { return x.open + "〜" + x.close; }).join("・") : "いつもは受付のない日です。") +
+      (cs.length ? "（休みも入っています）" : "") + "</p>" +
+      '<button class="btn wide" id="nx">臨時で受付にする</button>' +
+      '<button class="btn line wide" id="nr">この日から期間で休みを入れる</button>' +
+      '<button class="btn gray wide" id="nc">やめる</button>');
+    $("#nc").onclick = closeSheet;
+    $("#nx").onclick = function () { extraForm(ymd); };
+    $("#nr").onclick = function () { closeSheet(); A.offPick = { start: ymd }; renderOff(); };
+  }
+  function extraForm(ymd) {
+    var cs = closuresOn(ymd), wk = weeklyHoursOf(ymd);
+    var o = wk.length ? toMin(wk[0].open) : 540, c = wk.length ? toMin(wk[wk.length - 1].close) : 720;
+    openSheet("<h3>" + esc(dayText(ymd)) + " を臨時で受付にする</h3>" +
+      (cs.length ? '<p class="note warn">この日に入っている休みは、この日の分だけ外れます（前後の日の休みはそのまま）。</p>' : "") +
+      '<div class="two"><label class="f"><span>何時から</span><select id="xf">' + timeOptions(360, 1365, hm(o)) + "</select></label>" +
+      '<label class="f"><span>何時まで</span><select id="xt">' + timeOptions(375, 1380, hm(c)) + "</select></label></div>" +
+      '<div class="chips" role="radiogroup"><button class="chip on" data-xk="public" role="radio" aria-checked="true">お客さまも予約できる</button><button class="chip" data-xk="staff" role="radio" aria-checked="false">手入力だけ（お客さまには出さない）</button></div>' +
+      noticeField("").replace("例：年末年始のお休み", "例：臨時で受付します") +
+      '<label class="f"><span>メモ（自分用・お客さまには見えません）</span><input id="xm" maxlength="100" placeholder="例：振替の受付"></label>' +
+      '<button class="btn wide" id="xy">受付にする</button><button class="btn gray wide" id="xn">やめる</button>');
+    $$("[data-nts]", $sb).forEach(function (b, i) { if (i === 0) { b.setAttribute("data-nts", "臨時で受付します"); b.textContent = "臨時で受付します"; } else b.remove(); });
+    wireNotice();
+    var kind = "public";
+    on("[data-xk]", function (el) {
+      kind = el.getAttribute("data-xk");
+      $$("[data-xk]", $sb).forEach(function (x) { var y = x === el; x.classList.toggle("on", y); x.setAttribute("aria-checked", String(y)); });
+    }, $sb);
+    $("#xn").onclick = closeSheet;
+    $("#xy").onclick = function () {
+      var f = $("#xf").value, t = $("#xt").value;
+      if (toMin(t) <= toMin(f)) { toast("「何時まで」は「何時から」より後にしてください。"); return; }
+      busy($("#xy"), api("admin_extra_add", { date: ymd, from: f, to: t, kind: kind, notice: kind === "public" ? $("#ntc").value.trim() : "", note: $("#xm").value.trim() })).then(function () {
+        closeSheet(); toast("臨時で受付にしました");
+        return refreshExtras().then(showOff);
+      }, fail);
+    };
+  }
   function noticeForm(c) {
     if (!c) return;
     var range = c.date === c.endDate ? dayText(c.date) : dayText(c.date) + "〜" + dayText(c.endDate);
@@ -712,8 +780,12 @@
   function offForm(ymd) {
     var hs = hoursOf(ymd), o = toMin(hs[0].open), c = toMin(hs[hs.length - 1].close);
     var already = closuresOn(ymd);
+    var wholeC = already.filter(function (x) { return wholeDay(x, ymd); });   // lifeplus-extra-hours-v1
     openSheet("<h3>" + dayText(ymd) + " を休みにする</h3>" +
       (already.length ? '<p class="note">この日はすでに休みが入っています：' + already.map(function (x) { return x.from === "00:00" && x.to === "24:00" || x.date < ymd ? "終日" : x.from + "〜" + x.to; }).join("・") + "</p>" : "") +
+      (wholeC.length ? '<button class="btn mint wide" id="oopen">この日だけ休みをやめて受付にする</button>' : "") +
+      (extrasOn(ymd).length ? '<p class="note">臨時の受付：' + extrasOn(ymd).map(function (x) { return x.open + "〜" + x.close; }).join("・") + "（外すときは下の「臨時の受付日」から）</p>" : "") +
+      '<button class="btn line wide" id="orange">この日から期間で休みを入れる</button>' +
       '<div class="chips" role="radiogroup"><button class="chip on" data-kind="all" role="radio" aria-checked="true">一日休み</button><button class="chip" data-kind="time" role="radio" aria-checked="false">時間だけ休み</button></div>' +
       '<div id="tset" hidden><div class="two"><label class="f"><span>何時から</span><select id="of">' + timeOptions(o, c - 15, hm(o)) + "</select></label>" +
       '<label class="f"><span>何時まで</span><select id="ot">' + timeOptions(o + 15, c, hm(c)) + "</select></label></div></div>" +
@@ -722,6 +794,12 @@
       '<button class="btn wide" id="oy">休みにする</button><button class="btn gray wide" id="onn">やめる</button>');
     var kind = "all";
     wireNotice();
+    $("#orange").onclick = function () { closeSheet(); A.offPick = { start: ymd }; renderOff(); };   // lifeplus-extra-hours-v1
+    if ($("#oopen")) $("#oopen").onclick = function () {
+      var p = Promise.resolve();
+      wholeC.forEach(function (x) { p = p.then(function () { return api("admin_closure_open_day", { id: x.id, date: ymd }); }); });
+      busy($("#oopen"), p).then(function () { closeSheet(); toast(dayText(ymd) + " を受付に戻しました"); showOff(); }, fail);
+    };
     on("[data-kind]", function (el) {
       kind = el.getAttribute("data-kind");
       $$("[data-kind]", $sb).forEach(function (x) { var y = x === el; x.classList.toggle("on", y); x.setAttribute("aria-checked", String(y)); });

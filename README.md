@@ -99,3 +99,14 @@ deno run -A tests/e2e_server.ts & python3 tests/e2e_test.py      # 画面 11項�
 - 表：`sql/lifeplus_closure_notice_v1.sql`（closures に notice）。★関所より先に流す（流さないうちに関所を入れ替えると、予約カレンダーが開かなくなる）
 - 関所：`month` に notices、`admin_closures` に notice、`admin_closure_add` が notice を受ける、`admin_closure_update`（お知らせだけ変える・権限 closures）
 - 確かめ：`tests/closure_notice_test.ts`（関所 7項目）・`tests/e2e_closure_test.py`（画面 18項目）
+
+## 2026-10-29 臨時の受付日・期間の休みの中の1日だけ受付に戻す（marker: lifeplus-extra-hours-v1）
+- 管理画面「休み」のカレンダーで、受付のない日（火・水・金・日など）も押せる →「臨時で受付にする」「この日から期間で休みを入れる」
+  - 臨時で受付にする：時間（6:00〜23:00・15分きざみ）・お客さまも予約できる／手入力だけ・お客さまへのお知らせ（例：臨時で受付します）・メモ
+  - その日に休みが入っていたら、その日の分だけ休みが外れる（前後の日の休みはそのまま）
+  - 「臨時の受付日」の一覧から外せる。外した時間に予約があれば知らせる（予約は自動では取り消さない）
+- 受付日を押したとき、休みが入っていれば「この日だけ休みをやめて受付にする」（期間の休みを、その日の前と後に分ける。メモ・お知らせは両方に残る）
+- お客さまの予約カレンダー：臨時の受付日（お客さまも予約できる）は選べる日になる。お知らせを付けたものは「お休みのお知らせ」の枠に時間つきで出る
+- 表：`sql/lifeplus_extra_hours_v1.sql`（extra_hours・lp_available_slots に臨時の受付時間を入れる）。★関所より先に流す
+- 関所：`admin_extra_add`・`admin_extra_del`・`admin_closure_open_day`（権限 closures）。`admin_init` に extras、`admin_day`・`admin_month`・`admin_slots`・`month`・`days` が臨時の受付時間を見る
+- 確かめ：`tests/extra_hours_test.ts`（関所 9項目）・`tests/e2e_extra_test.py`（画面 14項目）
