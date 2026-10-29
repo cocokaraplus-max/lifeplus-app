@@ -181,3 +181,12 @@ button.cal-d.on i { color: #fff; }
 .cal-key { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; font-size: 13px; color: var(--mute); margin: -4px 0 12px; }
 .day-wd.sun { color: var(--red); }
 #slots .day { scroll-margin-top: 12px; }
+
+/* ---------- お休みのお知らせ（カレンダーの上）  marker: lifeplus-closure-notice-v1 ---------- */
+.cal-notice { margin: 0 2px 12px; padding: 10px 12px 11px; border-radius: 12px; background: #fff7e6; border: 1px solid #f6d79b; }
+.cal-notice-h { display: flex; align-items: center; gap: 6px; font-size: 14px; color: #9a5b00; margin-bottom: 4px; }
+.cal-notice-h::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; flex: none; }
+.cal-notice ul { list-style: none; margin: 0; padding: 0; }
+.cal-notice li { font-size: 15px; line-height: 1.6; padding: 4px 0; font-weight: 700; color: var(--ink); }
+.cal-notice li + li { border-top: 1px dashed #f1d9a8; }
+.cal-notice-d { display: block; font-size: 13px; font-weight: 400; color: var(--mute); }

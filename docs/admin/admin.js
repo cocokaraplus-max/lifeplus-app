@@ -16,6 +16,7 @@
     day: null,         // admin_day の結果
     offMonth: null,    // 休みカレンダーの月（YYYY-MM）
     closures: [],      // これからの休み
+    offPick: null,     // lifeplus-closure-notice-v1: 期間を選んでいる途中（{ start: YYYY-MM-DD か null }）
     q: "", filter: "", // お客さまの検索
     dev: "",           // お店の端末の合鍵（LINE を使わずに開くとき）  admin-device-v1
   };
@@ -40,6 +41,7 @@
     booking_not_pending: "この予約はもう確認済みです。",
     booking_not_found: "この予約は見つかりませんでした。",
     customer_not_found: "このお客さまは見つかりませんでした。",
+    closure_not_found: "この休みは見つかりませんでした。もう外されているかもしれません。",   // lifeplus-closure-notice-v1
     slot_not_available: "その時間はもう埋まっています。別の時間を選んでください。",
     customer_blocked: "ブロック中のお客さまです。先にブロックを外してください。",
     name_required: "お名前を入れてください。",
@@ -582,6 +584,7 @@
   // =============================================================
   function showOff() {
     if (!A.offMonth) A.offMonth = A.init.today.slice(0, 7);
+    A.offPick = null;
     loadingMain("休みの設定");
     api("admin_closures").then(function (r) { A.closures = r.closures; if (A.tab === "off") renderOff(); }, fail);
   }
@@ -596,7 +599,12 @@
     var first = ym + "-01", days = new Date(Date.UTC(y, mo, 0)).getUTCDate(), lead = wdOf(first);
     var thisMonth = A.init.today.slice(0, 7);
     var prev = ymdUTC(new Date(Date.UTC(y, mo - 2, 1))).slice(0, 7), next = ymdUTC(new Date(Date.UTC(y, mo, 1))).slice(0, 7);
-    var h = '<div class="card"><div class="cal-head">' +
+    var pk = A.offPick;   // lifeplus-closure-notice-v1: 期間を選んでいる途中
+    var h = (pk ? '<div class="pick-bar" role="status"><b>' + (pk.start ? "終わりの日を押してください" : "始まりの日を押してください") + "</b>" +
+        (pk.start ? "<span>始まり：" + esc(dayText(pk.start)) + "（1日だけのときは同じ日をもう一度）</span>" : "<span>受付のない日も選べます。月をまたぐときは ‹ › で切り替えてください</span>") +
+        '<button class="btn gray small" id="pcancel">やめる</button></div>'
+      : '<button class="btn wide range-btn" id="prange">期間で休みを入れる（お盆・年末年始など）</button>') +
+      '<div class="card' + (pk ? " picking" : "") + '"><div class="cal-head">' +
       '<button class="cal-nav" id="pm" aria-label="前の月"' + (ym <= thisMonth ? " disabled" : "") + ">‹</button>" +
       '<span class="cal-title">' + y + "年" + mo + "月</span>" +
       '<button class="cal-nav" id="nm" aria-label="次の月">›</button></div><div class="cal-grid">';
@@ -608,29 +616,93 @@
       var whole = cs.some(function (c) { return wholeDay(c, ymd); });
       var cls = !hasH ? "none" : whole ? "closed" : cs.length ? "part" : "open";
       var mark = !hasH ? "" : whole ? "休" : cs.length ? "一部" : "";
-      if (past || !hasH) h += '<span class="cal-d ' + (past ? "none" : cls) + '">' + dd + "</span>";
-      else h += '<button class="cal-d ' + cls + (ymd === A.init.today ? " today" : "") + '" data-off="' + ymd + '" aria-label="' + dayText(ymd) + (mark ? " " + mark : "") + '">' + dd + "<i>" + mark + "</i></button>";
+      var noticed = cs.some(function (c) { return c.notice; });
+      if (pk && !past) h += '<button class="cal-d ' + cls + (pk.start === ymd ? " sel" : "") + (noticed ? " ntc" : "") + '" data-pick="' + ymd + '" aria-label="' + dayText(ymd) + (mark ? " " + mark : "") + '">' + dd + "<i>" + mark + "</i></button>";
+      else if (past || !hasH) h += '<span class="cal-d ' + (past ? "none" : cls) + '">' + dd + "</span>";
+      else h += '<button class="cal-d ' + cls + (ymd === A.init.today ? " today" : "") + (noticed ? " ntc" : "") + '" data-off="' + ymd + '" aria-label="' + dayText(ymd) + (mark ? " " + mark : "") + '">' + dd + "<i>" + mark + "</i></button>";
     }
-    h += '</div><div class="legend" style="margin-top:8px"><span><i class="sw" style="background:var(--blue-soft)"></i>受付日</span><span><i class="sw x"></i>休み</span><span><i class="sw" style="background:var(--amber-soft)"></i>一部休み</span></div>' +
-      '<p class="note">受付日を押すと、その日を休みにできます。時間だけ休むこともできます。</p></div>';
+    h += '</div><div class="legend" style="margin-top:8px"><span><i class="sw" style="background:var(--blue-soft)"></i>受付日</span><span><i class="sw x"></i>休み</span><span><i class="sw" style="background:var(--amber-soft)"></i>一部休み</span><span><b class="ntc-dot"></b>お知らせあり</span></div>' +
+      '<p class="note">受付日を押すと、その日を休みにできます。時間だけ休むこともできます。何日も続けて休むときは「期間で休みを入れる」から。</p></div>';
 
     h += "<h2>これからの休み</h2>";
     h += A.closures.length ? '<div class="card offl">' + A.closures.map(function (c) {
       var range = c.date === c.endDate ? dayText(c.date) : mds(c.date) + "〜" + mds(c.endDate);
       var t = c.from === "00:00" && c.to === "24:00" ? "終日" : c.from + "〜" + c.to;
-      return '<div class="oi"><b>' + esc(range) + "</b><span>" + esc(t) + (c.note ? "　" + esc(c.note) : "") + '</span><button class="link red" data-del="' + esc(c.id) + '">外す</button></div>';
+      return '<div class="oi"><div class="oi-m"><b>' + esc(range) + "</b><span>" + esc(t) + (c.note ? "　" + esc(c.note) : "") + "</span>" +
+        (c.notice ? '<em class="oi-ntc">お知らせ：' + esc(c.notice) + "</em>" : "") + "</div>" +
+        '<button class="link" data-ntc="' + esc(c.id) + '">お知らせ</button><button class="link red" data-del="' + esc(c.id) + '">外す</button></div>';
     }).join("") + "</div>" : '<div class="card empty">これからの休みは入っていません。</div>';
 
     frame('<div class="day"><h1 class="title">休みの設定</h1></div><div class="sub">祝日も受付します。休む日・時間だけここで止めます</div>', h);
     $("#pm").onclick = function () { A.offMonth = prev; renderOff(); };
     $("#nm").onclick = function () { A.offMonth = next; renderOff(); };
+    if ($("#prange")) $("#prange").onclick = function () { A.offPick = { start: null }; renderOff(); };
+    if ($("#pcancel")) $("#pcancel").onclick = function () { A.offPick = null; renderOff(); };
+    on("[data-pick]", function (el) {
+      var d = el.getAttribute("data-pick");
+      if (!A.offPick.start) { A.offPick.start = d; renderOff(); return; }
+      var a = A.offPick.start, b = d;
+      if (b < a) { var x = a; a = b; b = x; }
+      A.offPick = null; renderOff();
+      rangeForm(a, b);
+    });
     on("[data-off]", function (el) { offForm(el.getAttribute("data-off")); });
+    on("[data-ntc]", function (el) { noticeForm(A.closures.filter(function (x) { return x.id === el.getAttribute("data-ntc"); })[0]); });
     on("[data-del]", function (el) {
       var c = A.closures.filter(function (x) { return x.id === el.getAttribute("data-del"); })[0];
-      confirmSheet("この休みを外しますか？", (c.date === c.endDate ? dayText(c.date) : mds(c.date) + "〜" + mds(c.endDate)) + " は、また予約を受けられるようになります。", "外す", function () {
+      confirmSheet("この休みを外しますか？", (c.date === c.endDate ? dayText(c.date) : mds(c.date) + "〜" + mds(c.endDate)) + " は、また予約を受けられるようになります。" + (c.notice ? "予約カレンダーのお知らせも消えます。" : ""), "外す", function () {
         return api("admin_closure_del", { id: c.id }).then(function () { closeSheet(); toast("休みを外しました"); showOff(); });
       });
     });
+  }
+  // lifeplus-closure-notice-v1: お客さまへのお知らせの欄（予約カレンダーの上に出る）
+  var NOTICE_SAMPLES = ["年末年始のお休み", "お盆休み", "臨時休業", "研修のため休み"];
+  function noticeField(val) {
+    return '<label class="f"><span>お客さまへのお知らせ（予約カレンダーの上に出ます。なくても大丈夫です）</span>' +
+      '<input id="ntc" maxlength="60" value="' + esc(val || "") + '" placeholder="例：年末年始のお休み"></label>' +
+      '<div class="chips ntc-chips">' + NOTICE_SAMPLES.map(function (x) { return '<button class="chip" type="button" data-nts="' + esc(x) + '">' + esc(x) + "</button>"; }).join("") + "</div>";
+  }
+  function wireNotice() { on("[data-nts]", function (el) { $("#ntc").value = el.getAttribute("data-nts"); }, $sb); }
+  function rangeSummary(a, b) {
+    if (!a || !b || b < a) return "終わりの日は、始まりの日と同じか後にしてください。";
+    var n = 0, open = 0;
+    for (var d = a; d <= b && n < 400; d = addDays(d, 1)) { n++; if (hoursOf(d).length) open++; }
+    return n + "日間（そのうち受付日 " + open + "日）を休みにします。";
+  }
+  function rangeForm(a, b) {
+    openSheet("<h3>期間で休みを入れる</h3>" +
+      '<div class="two"><label class="f"><span>始まりの日</span><input type="date" id="rs" value="' + a + '" min="' + A.init.today + '"></label>' +
+      '<label class="f"><span>終わりの日</span><input type="date" id="re" value="' + b + '" min="' + A.init.today + '"></label></div>' +
+      '<p class="note" id="rsum">' + esc(rangeSummary(a, b)) + "</p>" +
+      noticeField("") +
+      '<label class="f"><span>メモ（自分用・お客さまには見えません）</span><input id="rm" maxlength="100" placeholder="例：家族旅行"></label>' +
+      '<button class="btn wide" id="ry">休みにする</button><button class="btn gray wide" id="rn">やめる</button>');
+    wireNotice();
+    var upd = function () { $("#rsum").textContent = rangeSummary($("#rs").value, $("#re").value); };
+    $("#rs").onchange = upd; $("#re").onchange = upd;
+    $("#rn").onclick = closeSheet;
+    $("#ry").onclick = function () {
+      var d1 = $("#rs").value, d2 = $("#re").value;
+      if (!d1 || !d2 || d2 < d1) { toast("終わりの日は、始まりの日と同じか後にしてください。"); return; }
+      if (d1 < A.init.today) { toast("今日より前の日は選べません。"); return; }
+      busy($("#ry"), api("admin_closure_add", { date: d1, endDate: d2, notice: $("#ntc").value.trim(), note: $("#rm").value.trim() })).then(function (r) {
+        closeSheet(); toast("休みにしました"); A.offMonth = d1.slice(0, 7); afterClosure(r); showOff();
+      }, fail);
+    };
+  }
+  function noticeForm(c) {
+    if (!c) return;
+    var range = c.date === c.endDate ? dayText(c.date) : dayText(c.date) + "〜" + dayText(c.endDate);
+    openSheet("<h3>お知らせを変える</h3><p class=\"note\">" + esc(range) + " の休み。空にすると、予約カレンダーにお知らせは出なくなります（休みはそのまま）。</p>" +
+      noticeField(c.notice) +
+      '<button class="btn wide" id="ny">保存する</button><button class="btn gray wide" id="nn">やめる</button>');
+    wireNotice();
+    $("#nn").onclick = closeSheet;
+    $("#ny").onclick = function () {
+      busy($("#ny"), api("admin_closure_update", { id: c.id, notice: $("#ntc").value.trim() })).then(function () {
+        closeSheet(); toast("お知らせを保存しました"); showOff();
+      }, fail);
+    };
   }
   function timeOptions(from, to, sel) {
     var h = "";
@@ -645,10 +717,11 @@
       '<div class="chips" role="radiogroup"><button class="chip on" data-kind="all" role="radio" aria-checked="true">一日休み</button><button class="chip" data-kind="time" role="radio" aria-checked="false">時間だけ休み</button></div>' +
       '<div id="tset" hidden><div class="two"><label class="f"><span>何時から</span><select id="of">' + timeOptions(o, c - 15, hm(o)) + "</select></label>" +
       '<label class="f"><span>何時まで</span><select id="ot">' + timeOptions(o + 15, c, hm(c)) + "</select></label></div></div>" +
-      '<div id="dset"><label class="f"><span>何日まで（連休のとき）</span><input type="date" id="oe" value="' + ymd + '" min="' + ymd + '"></label></div>' +
+      '<div id="dset"><label class="f"><span>何日まで（連休のとき）</span><input type="date" id="oe" value="' + ymd + '" min="' + ymd + '"></label>' + noticeField("") + "</div>" +
       '<label class="f"><span>メモ（自分用・患者さんには見えません）</span><input id="on" maxlength="100" placeholder="例：研修、家の用事"></label>' +
       '<button class="btn wide" id="oy">休みにする</button><button class="btn gray wide" id="onn">やめる</button>');
     var kind = "all";
+    wireNotice();
     on("[data-kind]", function (el) {
       kind = el.getAttribute("data-kind");
       $$("[data-kind]", $sb).forEach(function (x) { var y = x === el; x.classList.toggle("on", y); x.setAttribute("aria-checked", String(y)); });
@@ -663,6 +736,7 @@
       } else {
         p.endDate = $("#oe").value || ymd;
         if (p.endDate < ymd) { toast("終わりの日は、始まりの日より後にしてください。"); return; }
+        p.notice = $("#ntc").value.trim();   // lifeplus-closure-notice-v1
       }
       busy($("#oy"), api("admin_closure_add", p)).then(function (r) {
         closeSheet(); toast("休みにしました"); afterClosure(r); showOff();

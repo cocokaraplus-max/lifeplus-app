@@ -90,3 +90,12 @@ deno run -A tests/e2e_server.ts & python3 tests/e2e_test.py      # 画面 11項�
 - 表：`sql/lifeplus_site_v1.sql`（site_news・site_jobs・site_content、権限に site、storage の site）
 - 確かめ：`tests/site_test.ts`（関所 10項目）・`tests/e2e_cms_test.py`（画面 37項目）
   ★テスト用DBは `now()` をテストの「今」にそろえる：`create function public.now() …` と `alter database … set search_path = public, pg_catalog`
+
+## 2026-10-29 期間の休み・お休みのお知らせ（marker: lifeplus-closure-notice-v1）
+- 管理画面の「休み」に「期間で休みを入れる（お盆・年末年始など）」。カレンダーで始まりの日 → 終わりの日を押す（月をまたいでよい・受付のない日も押せる）と、期間・何日間（受付日が何日か）が出る
+- 休みに「お客さまへのお知らせ」（60字まで・なくてもよい）を付けられる。例のボタン：年末年始のお休み／お盆休み／臨時休業／研修のため休み。1日の休みにも付けられる。一覧の「お知らせ」から、あとで変える・空にして消すこともできる（休みはそのまま）
+- お知らせのある休みは、お客さまの予約カレンダーの上に「お休みのお知らせ」として出る（これからの休みで、予約できる日までに始まるもの・5件まで）。メモ（自分用）は出ない
+- お客さまのカレンダーは、見せる受付時間（kind=public）のある曜日だけを受付日にする（手入力だけの曜日が「×満席」に見えていたのを「休」に）
+- 表：`sql/lifeplus_closure_notice_v1.sql`（closures に notice）。★関所より先に流す（流さないうちに関所を入れ替えると、予約カレンダーが開かなくなる）
+- 関所：`month` に notices、`admin_closures` に notice、`admin_closure_add` が notice を受ける、`admin_closure_update`（お知らせだけ変える・権限 closures）
+- 確かめ：`tests/closure_notice_test.ts`（関所 7項目）・`tests/e2e_closure_test.py`（画面 18項目）

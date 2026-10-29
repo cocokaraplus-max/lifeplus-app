@@ -272,3 +272,25 @@ main { padding-bottom: 90px; }
 .photo-slot b { font-size: 13.5px; line-height: 1.4; }
 .pick { text-align: center; cursor: pointer; display: block; }
 .pick.busy { opacity: .5; pointer-events: none; }
+
+/* ---------- 期間を選んで休みにする・お知らせ  marker: lifeplus-closure-notice-v1 ---------- */
+.range-btn { margin: 0 0 12px; }
+.pick-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0 0 12px; padding: 12px 14px; border-radius: 14px;
+  background: var(--blue); color: #fff; }
+.pick-bar b { font-size: 17px; }
+.pick-bar span { flex: 1 1 14em; font-size: 13px; opacity: .9; }
+.pick-bar .btn.small { margin-left: auto; }
+.card.picking .cal-d.none { color: #8a93a6; background: #f3f5f9; }
+.card.picking button.cal-d { cursor: pointer; }
+.card.picking button.cal-d:hover { border-color: var(--blue); }
+.cal-d.sel { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue) inset; }
+.cal-d.ntc { position: relative; }
+.cal-d.ntc::after { content: ""; position: absolute; top: 5px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; }
+.ntc-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; margin-right: 4px; vertical-align: middle; }
+.offl .oi-m { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+.offl .oi-m b { min-width: 7.5em; }
+.offl .oi-m span { flex: 1; color: var(--mute); font-size: 13.5px; }
+.oi-ntc { flex-basis: 100%; font-style: normal; font-size: 13px; color: #9a5b00; background: #fff7e6; border-radius: 8px; padding: 2px 8px; width: fit-content; max-width: 100%; }
+.ntc-chips { margin-top: -2px; }
+.two > * { min-width: 0; }
+.two .f input[type="date"] { min-width: 0; max-width: 100%; }

@@ -247,7 +247,10 @@
     $cal.classList.add("busy");
     api("month", { menuId: S.menu.id, month: month }).then(function (r) {
       S.from = r.month;
-      var h = '<div class="cal-head">' +
+      // lifeplus-closure-notice-v1: お盆・年末年始などのお休みのお知らせ（カレンダーの上）
+      var nt = (r.notices || []).length ? '<div class="cal-notice" role="note"><b class="cal-notice-h">お休みのお知らせ</b><ul>' +
+        r.notices.map(function (x) { return '<li><span class="cal-notice-d">' + esc(x.label) + "</span>" + esc(x.text) + "</li>"; }).join("") + "</ul></div>" : "";
+      var h = nt + '<div class="cal-head">' +
         '<button class="cal-nav" id="pm"' + (r.prev ? "" : " disabled") + ' aria-label="前の月">‹</button>' +
         '<span class="cal-title">' + esc(r.label) + "</span>" +
         '<button class="cal-nav" id="nm"' + (r.next ? "" : " disabled") + ' aria-label="次の月">›</button></div>' +

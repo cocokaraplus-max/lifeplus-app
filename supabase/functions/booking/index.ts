@@ -127,12 +127,22 @@ async function adminIds(sql: Sql): Promise<string[]> {
   return String(r[0]?.value ?? "").split(",").map((x) => x.trim()).filter(Boolean);
 }
 
+// ---------- 休みのお知らせ（予約カレンダーに出す）  marker: lifeplus-closure-notice-v1 ----------
+function dayLabel(ymd: string): string { return `${Number(ymd.slice(5, 7))}/${Number(ymd.slice(8, 10))}（${WEEKDAYS[isoWeekday(ymd) % 7]}）`; }
+function closureView(c: Record<string, unknown>) {
+  const s = c.starts_at as Date, e = c.ends_at as Date;
+  const date = jstDate(s), endDate = jstDate(new Date(e.getTime() - 1));
+  const from = jstTime(s), to = jstTime(e) === "00:00" ? "24:00" : jstTime(e);
+  const whole = from === "00:00" && to === "24:00";
+  return { date, endDate, from, to, whole, label: (date === endDate ? dayLabel(date) : `${dayLabel(date)}〜${dayLabel(endDate)}`) + (whole ? "" : ` ${from}〜${to}`) };
+}
+
 // ---------- 管理画面を使える人  marker: staff-perms-v1 ----------
 export const PERMS = ["closures", "bookings", "customers", "notify", "site"] as const;   // lifeplus-site-cms-v1: site＝ホームページの変更
 // 操作ごとに要る権限（null は全員、owner はHIROさんだけ）
 const PERM_OF: Record<string, string | null> = {
   admin_init: null, admin_day: null, admin_month: null, admin_pending: null,
-  admin_closures: "closures", admin_closure_add: "closures", admin_closure_del: "closures",
+  admin_closures: "closures", admin_closure_add: "closures", admin_closure_del: "closures", admin_closure_update: "closures",   // lifeplus-closure-notice-v1
   admin_decide: "bookings", admin_outcome: "bookings", admin_cancel: "bookings", admin_slots: "bookings", admin_book: "bookings",
   admin_customers: "customers", admin_customer: "customers", admin_customer_update: "customers", admin_message: "customers",
   admin_customer_delete: "customers",
@@ -762,7 +772,7 @@ export async function handle(body: any, deps: Deps): Promise<Record<string, unkn
       const st = await settings(sql);
       const last = addDays(today, st.horizonDays);
       if (ym > last.slice(0, 7)) ym = last.slice(0, 7);
-      const hours = await sql`select distinct weekday from business_hours`;
+      const hours = await sql`select distinct weekday from business_hours where kind = 'public'`;   // lifeplus-closure-notice-v1: お客さまには見せる受付時間の曜日だけ
       const openW = new Set(hours.map((h: Record<string, unknown>) => Number(h.weekday)));
       const first = ym + "-01";
       const days = [];
@@ -779,9 +789,15 @@ export async function handle(body: any, deps: Deps): Promise<Record<string, unkn
       }
       const prevM = addDays(first, -1).slice(0, 7);
       const nextM = addDays(addDays(first, 31).slice(0, 7) + "-01", 0).slice(0, 7);
+      // lifeplus-closure-notice-v1: お知らせの付いた休み（これから・予約できる日までに始まるもの）
+      const nrows = await sql`select starts_at, ends_at, notice from closures
+        where notice is not null and notice <> '' and ends_at > ${now.toISOString()}::timestamptz
+          and starts_at < ${addDays(last, 1) + "T00:00:00+09:00"}::timestamptz
+        order by starts_at limit 5`;
+      const notices = nrows.map((c: Record<string, unknown>) => { const v = closureView(c); return { date: v.date, endDate: v.endDate, label: v.label, text: c.notice }; });
       return {
         month: ym, label: `${Number(ym.slice(0, 4))}年${Number(ym.slice(5))}月`, lead: isoWeekday(first) % 7, days,
-        prev: prevM >= today.slice(0, 7) ? prevM : null, next: nextM <= last.slice(0, 7) ? nextM : null,
+        prev: prevM >= today.slice(0, 7) ? prevM : null, next: nextM <= last.slice(0, 7) ? nextM : null, notices,
       };
     }
 
@@ -1132,11 +1148,11 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
 
     // 休み
     case "admin_closures": {
-      const rows = await sql`select id, starts_at, ends_at, note from closures where ends_at > ${now.toISOString()}::timestamptz order by starts_at limit 100`;
+      const rows = await sql`select id, starts_at, ends_at, note, notice from closures where ends_at > ${now.toISOString()}::timestamptz order by starts_at limit 100`;
       return {
         closures: rows.map((c: Record<string, unknown>) => {
-          const s = c.starts_at as Date, e = c.ends_at as Date;
-          return { id: c.id, date: jstDate(s), endDate: jstDate(new Date(e.getTime() - 1)), from: jstTime(s), to: jstTime(e) === "00:00" ? "24:00" : jstTime(e), note: c.note ?? "" };
+          const v = closureView(c);   // lifeplus-closure-notice-v1
+          return { id: c.id, date: v.date, endDate: v.endDate, from: v.from, to: v.to, note: c.note ?? "", notice: c.notice ?? "" };
         }),
       };
     }
@@ -1147,9 +1163,17 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
       const start = new Date(Date.parse(`${d1}T${f}:00+09:00`)).toISOString();
       const end = t === "24:00" ? new Date(Date.parse(`${d2}T00:00:00+09:00`) + 86400000).toISOString() : new Date(Date.parse(`${d2}T${t}:00+09:00`)).toISOString();
       if (end <= start) throw new ApiError("bad_request");
-      await sql`insert into closures (starts_at, ends_at, note) values (${start}::timestamptz, ${end}::timestamptz, ${str(body.note, 100) || null})`;
+      // lifeplus-closure-notice-v1: notice＝お客さまの予約カレンダーに出すお知らせ（60字まで・なくてもよい）
+      await sql`insert into closures (starts_at, ends_at, note, notice) values (${start}::timestamptz, ${end}::timestamptz, ${str(body.note, 100) || null}, ${str(body.notice, 60) || null})`;
       const conflicts = await bookingsWhere(sql, sql`b.status in ('pending','confirmed') and tstzrange(b.starts_at, b.ends_at, '[)') && tstzrange(${start}::timestamptz, ${end}::timestamptz, '[)')`);
       return { ok: true, conflicts };
+    }
+    case "admin_closure_update": {   // lifeplus-closure-notice-v1: お知らせだけを変える
+      const id = str(body.id, 40);
+      if (!UUID_RE.test(id)) throw new ApiError("bad_request");
+      const r = await sql`update closures set notice = ${str(body.notice, 60) || null} where id = ${id}::uuid returning id`;
+      if (!r.length) throw new ApiError("closure_not_found", 404);
+      return { ok: true };
     }
     case "admin_closure_del": {
       const id = str(body.id, 40);
