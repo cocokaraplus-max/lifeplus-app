@@ -1227,3 +1227,9 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
   .flow-bar.sun .fb-line > span { font-size: 11px; }
 }
 @media (max-width: 380px) { .flow-tabs b { font-size: 13.5px; } .flow-tabs span { font-size: 10.5px; letter-spacing: 0; } }
+
+/* ---------- 1日の流れの切り替えボタンを上に付いてこさせる（lifeplus-flow-sticky-v1）---------- */
+.flow-tabs { position: sticky; top: 84px; z-index: 20; }
+.flow-tabs { box-shadow: 0 10px 28px -14px rgba(35,38,43,.45); }
+@media (max-width: 1200px) { .flow-tabs { top: 76px; } }
+@media (max-width: 760px) { .flow-tabs { top: 74px; } }
