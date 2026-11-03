@@ -331,3 +331,8 @@ button, a { -webkit-tap-highlight-color: rgba(29, 78, 216, .18); }
   background: var(--ink); color: #fff; font-size: 14px; font-weight: 700; box-shadow: 0 6px 18px rgba(30, 42, 74, .3); touch-action: manipulation; }
 .kbd-close[hidden] { display: none; }
 .sheet { transition: bottom .15s ease-out; }
+
+/* ---------- 重なっても入れる  marker: lifeplus-overlap-v1 ---------- */
+.time.busy { background: #fff4dc; border-color: #f0c36d; color: #9a5b00; position: relative; }
+.time.busy.on { background: var(--blue); color: #fff; border-color: var(--blue); }
+.tk.ov { background: #b45309; color: #fff; }

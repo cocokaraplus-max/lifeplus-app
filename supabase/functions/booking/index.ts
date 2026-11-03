@@ -1301,6 +1301,7 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
       const d = str(body.date, 10), menuId = str(body.menuId, 40);
       if (!DATE_RE.test(d) || !UUID_RE.test(menuId)) throw new ApiError("bad_request");
       const any = body.any === true;
+      const ov = body.overlap === true;   // lifeplus-overlap-v1: ほかの予約と重なる時間も出す
       const rows = await sql`
         with m as (select duration_min, buffer_after_min from menus where id = ${menuId}::uuid),
         h as (select kind, ((${d}::date + open_time) at time zone 'Asia/Tokyo') as op, ((${d}::date + close_time) at time zone 'Asia/Tokyo') as cl
@@ -1314,11 +1315,13 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
               from h, m, generate_series(h.op, h.cl - make_interval(mins => m.duration_min), interval '15 minutes') gs),
         c2 as (select distinct on (c.s) c.s, c.b, c.kind from c
                order by c.s, case c.kind when 'public' then 0 when 'staff' then 1 else 2 end)
-        select c2.s, c2.kind from c2 where not exists (
+        select c2.s, c2.kind, exists (
           select 1 from bookings bk where bk.status in ('pending','confirmed')
-            and tstzrange(bk.starts_at, bk.block_until, '[)') && tstzrange(c2.s, c2.b, '[)'))
+            and tstzrange(bk.starts_at, bk.block_until, '[)') && tstzrange(c2.s, c2.b, '[)')) as busy
+        from c2
         order by c2.s`;
-      return { slots: rows.map((r: Record<string, unknown>) => ({ startsAt: (r.s as Date).toISOString(), time: jstTime(r.s as Date), kind: r.kind })) };
+      return { slots: rows.filter((r: Record<string, unknown>) => ov || !r.busy)
+        .map((r: Record<string, unknown>) => ({ startsAt: (r.s as Date).toISOString(), time: jstTime(r.s as Date), kind: r.kind, busy: !!r.busy })) };
     }
     case "admin_book": {
       const menuId = str(body.menuId, 40);
@@ -1348,7 +1351,7 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
       }
       let id: string;
       try {
-        const r = await sql`select lp_create_booking(${custId}::uuid, ${menuId}::uuid, ${new Date(t).toISOString()}::timestamptz, null::text[], 'admin') as id`;
+        const r = await sql`select lp_create_booking(${custId}::uuid, ${menuId}::uuid, ${new Date(t).toISOString()}::timestamptz, null::text[], 'admin', ${body.allowOverlap === true}) as id`;   // lifeplus-overlap-v1
         id = r[0].id;
       } catch (e) {
         const msg = String((e as Error).message);

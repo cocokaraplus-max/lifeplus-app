@@ -342,12 +342,33 @@
       h += "<" + tag + ' class="xblk" data-x="' + esc(c.id) + '" style="display:flex;align-items:center;top:' + (y(s) + 3) + "px;height:" + (y(e) - y(s) - 6) + 'px">× ' +
         esc(c.from === "00:00" && c.to === "24:00" ? "終日お休み" : c.from + "〜" + c.to) + (c.note ? "　" + esc(c.note) : "") + "</" + tag + ">";
     });
+    /* lifeplus-overlap-v1: 時間が重なった予約は横に並べる（lane＝何列目、lanes＝その重なりの列の数） */
+    var lane = {}, lanes = {};
+    (function () {
+      var live = d.bookings.filter(function (b) { return b.status !== "cancelled" && b.status !== "rejected"; }).map(function (b) {
+        var s = toMin(b.time), e = toMin(b.blockUntil) || toMin(b.endTime);
+        if (e <= s) e = s + (b.durationMin || 15);
+        return { id: b.id, s: s, e: e };
+      }).sort(function (x, z) { return x.s - z.s || x.e - z.e; });
+      var group = [], ends = [], gEnd = -1;
+      var flush = function () { group.forEach(function (x) { lanes[x.id] = ends.length; }); group = []; ends = []; gEnd = -1; };
+      live.forEach(function (x) {
+        if (x.s >= gEnd) flush();
+        var i = 0; while (i < ends.length && ends[i] > x.s) i++;
+        ends[i] = x.e; lane[x.id] = i; group.push(x); gEnd = Math.max(gEnd, x.e);
+      });
+      flush();
+    })();
+    var lanePos = function (id) {
+      var n = lanes[id] || 1, i = lane[id] || 0;
+      return n > 1 ? "left:calc(54px + (100% - 54px) * " + i + " / " + n + ");right:auto;width:calc((100% - 54px) / " + n + " - 4px);" : "";
+    };
     d.bookings.forEach(function (b) {
       var s = toMin(b.time), e = toMin(b.endTime), bu = toMin(b.blockUntil);
       if (e <= s) e = s + (b.durationMin || 15);
       var one = e - s <= 15;
       if (bu > e && (b.status === "pending" || b.status === "confirmed")) {
-        h += '<div class="clean" style="top:' + y(e) + "px;height:" + (y(bu) - y(e) - 3) + 'px" aria-hidden="true">片付け・準備</div>';
+        h += '<div class="clean" style="' + lanePos(b.id) + 'top:' + y(e) + "px;height:" + (y(bu) - y(e) - 3) + 'px" aria-hidden="true">片付け・準備</div>';   // lifeplus-overlap-v1
       }
       var tags = "";
       if (b.status === "pending") tags += '<span class="tag">確認待ち</span>';
@@ -356,7 +377,7 @@
       if (b.status === "late_cancel") tags += '<span class="tag red">直前取消</span>';
       if (b.status !== "pending" && !b.customer.isReturning) tags += '<span class="tag">初めて</span>';
       if (b.customer.noShows) tags += '<span class="tag red">無断' + b.customer.noShows + "回</span>";
-      h += '<button class="bk ' + bizClass(b.businessId) + " " + esc(b.status) + (one ? " one" : "") + '" data-bk="' + esc(b.id) + '" style="top:' + (y(s) + 2) + "px;height:" + (y(e) - y(s) - 4) + 'px">' +
+      h += '<button class="bk ' + bizClass(b.businessId) + " " + esc(b.status) + (one ? " one" : "") + '" data-bk="' + esc(b.id) + '" style="' + lanePos(b.id) + 'top:' + (y(s) + 2) + "px;height:" + (y(e) - y(s) - 4) + 'px">' +   /* lifeplus-overlap-v1 */
         '<span class="who">' + esc(b.customer.name || "（名前なし）") + tags + "</span>" +
         '<span class="what">' + esc(b.time + "〜" + b.endTime + "　" + b.menuName) + "</span></button>";
     });
@@ -954,6 +975,7 @@
       '<label class="f"><span>日にち</span><input type="date" id="bd" value="' + esc(date) + '" min="' + esc(A.init.today) + '"></label>' +
       '<div class="f"><span>時間</span><div id="bt"></div></div>' +
       '<label class="check"><input type="checkbox" id="bany"' + (o.any ? " checked" : "") + '>受付時間の外も出す（知り合いなど）</label>' +   // lifeplus-hours-kind-v1
+      '<label class="check"><input type="checkbox" id="bov">ほかの予約と時間が重なっても入れる</label>' +   // lifeplus-overlap-v1
       '<label class="check" id="tellw"><input type="checkbox" id="btell" checked>患者さんのLINEに知らせる</label>' +
       '<p class="note">手で入れた予約は、初めての方でもすぐ確定になります。休み・×の時間にも入れられます。<b class="tk staff">手</b>は手入力だけの時間、<b class="tk other">外</b>は受付時間の外です（どちらもお客さまには見えません）。</p>' +
       '<button class="btn mint wide" id="bgo" disabled>この内容で入れる</button><button class="btn gray wide" id="bno">やめる</button>');
@@ -1006,13 +1028,14 @@
       var mid = $("#bm").value; date = $("#bd").value;
       if (!date) { $("#bt").innerHTML = ""; return; }
       $("#bt").innerHTML = '<div class="spinner" aria-hidden="true" style="margin:8px auto"></div>';
-      api("admin_slots", { date: date, menuId: mid, any: !!($("#bany") && $("#bany").checked) }).then(function (r) {
+      api("admin_slots", { date: date, menuId: mid, any: !!($("#bany") && $("#bany").checked), overlap: !!($("#bov") && $("#bov").checked) }).then(function (r) {   // lifeplus-overlap-v1
         var $t = $("#bt"); if (!$t) return;
         if (!r.slots.length) { $t.innerHTML = '<p class="note">この日は入れられる時間がありません（受付のない曜日か、埋まっています）。「受付時間の外も出す」で、ほかの時間も選べます。</p>'; return; }
         $t.innerHTML = '<div class="times">' + r.slots.map(function (s) {
           var k = s.kind || "public";
-          return '<button class="time ' + esc(k === "public" ? "" : k) + '" data-at="' + esc(s.startsAt) + '" data-t="' + esc(s.time) + '">' + esc(s.time) +
-            (k === "staff" ? '<b class="tk staff">手</b>' : k === "other" ? '<b class="tk other">外</b>' : "") + "</button>";
+          return '<button class="time ' + esc(k === "public" ? "" : k) + (s.busy ? " busy" : "") + '" data-at="' + esc(s.startsAt) + '" data-t="' + esc(s.time) + '">' + esc(s.time) +
+            (k === "staff" ? '<b class="tk staff">手</b>' : k === "other" ? '<b class="tk other">外</b>' : "") +
+            (s.busy ? '<b class="tk ov">重</b>' : "") + "</button>";   // lifeplus-overlap-v1: もう予約がある時間
         }).join("") + "</div>";
         var pick = function (el) {
           $$(".time", $t).forEach(function (x) { x.classList.toggle("on", x === el); });
@@ -1026,11 +1049,13 @@
     if (o.menuId) $("#bm").value = o.menuId;
     drawWho();
     $("#bm").onchange = loadTimes; $("#bd").onchange = loadTimes; $("#bany").onchange = loadTimes;
+    $("#bov").onchange = loadTimes;   // lifeplus-overlap-v1
     $("#bno").onclick = closeSheet;
     $("#bgo").onclick = function () {
       if (!picked) return;
       var p = { menuId: $("#bm").value, startsAt: picked, tellPatient: !!(cust && cust.hasLine && $("#btell").checked) };
       p.chartNo = cust ? ($("#bc2") ? $("#bc2").value.trim() : "") : ($("#bc") ? $("#bc").value.trim() : "");   // lifeplus-chart-no-v1
+      p.allowOverlap = !!($("#bov") && $("#bov").checked);   // lifeplus-overlap-v1
       if (cust) p.customerId = cust.id;
       else {
         p.name = $("#bn").value.trim(); p.nameKana = $("#bk").value.trim(); p.phone = $("#bp").value.trim();
