@@ -517,6 +517,9 @@
       h += '<div class="acts"><button class="btn gray" data-do="redo">記録を付け直す</button>' + (c.hasLine && can("customers") ? '<button class="btn line" data-do="msg">LINEで連絡</button>' : "") + "</div>";
     }
     if (can("customers")) h += '<button class="btn gray wide" data-do="cust">この方の情報・履歴を見る</button>';
+    /* lifeplus-overlap-v2: この予約の時間（ボディケアの途中も）に、別の予約を重ねて入れる。★手入力だけ */
+    if (can("bookings") && (b.status === "pending" || b.status === "confirmed"))
+      h += '<button class="btn wide" data-do="overlap" style="margin-top:8px">この予約の時間に重ねて予約を入れる</button>';
     if (owner() && b.status !== "pending" && b.status !== "confirmed")
       h += '<div class="danger-zone" style="text-align:center"><button class="link red" data-do="delbk">この予約を履歴から消す</button></div>';
     openSheet(h);
@@ -534,6 +537,7 @@
           .then(done("お断りして、ブロックしました"));
       });
       if (k === "cancel") cancelSheet(b);
+      if (k === "overlap") { closeSheet(); bookForm({ date: b.date, time: b.time, overlap: true }); }   // lifeplus-overlap-v2
       if (k === "msg") msgSheet(c);
       if (k === "done" || k === "no_show" || k === "late_cancel" || k === "redo") {
         busy(el, api("admin_outcome", { bookingId: b.id, outcome: k === "redo" ? "confirmed" : k })).then(function () {
@@ -975,7 +979,7 @@
       '<label class="f"><span>日にち</span><input type="date" id="bd" value="' + esc(date) + '" min="' + esc(A.init.today) + '"></label>' +
       '<div class="f"><span>時間</span><div id="bt"></div></div>' +
       '<label class="check"><input type="checkbox" id="bany"' + (o.any ? " checked" : "") + '>受付時間の外も出す（知り合いなど）</label>' +   // lifeplus-hours-kind-v1
-      '<label class="check"><input type="checkbox" id="bov">ほかの予約と時間が重なっても入れる</label>' +   // lifeplus-overlap-v1
+      '<label class="check"><input type="checkbox" id="bov"' + (o.overlap ? " checked" : "") + '>ほかの予約と時間が重なっても入れる（手入力だけ・ボディケアの途中も選べます）</label>' +   // lifeplus-overlap-v1 / lifeplus-overlap-v2
       '<label class="check" id="tellw"><input type="checkbox" id="btell" checked>患者さんのLINEに知らせる</label>' +
       '<p class="note">手で入れた予約は、初めての方でもすぐ確定になります。休み・×の時間にも入れられます。<b class="tk staff">手</b>は手入力だけの時間、<b class="tk other">外</b>は受付時間の外です（どちらもお客さまには見えません）。</p>' +
       '<button class="btn mint wide" id="bgo" disabled>この内容で入れる</button><button class="btn gray wide" id="bno">やめる</button>');
