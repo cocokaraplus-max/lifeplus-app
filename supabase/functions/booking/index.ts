@@ -174,6 +174,7 @@ const PERM_OF: Record<string, string | null> = {
   admin_closures: "closures", admin_closure_add: "closures", admin_closure_del: "closures", admin_closure_update: "closures",   // lifeplus-closure-notice-v1
   admin_extra_add: "closures", admin_extra_del: "closures", admin_closure_open_day: "closures",   // lifeplus-extra-hours-v1
   admin_decide: "bookings", admin_outcome: "bookings", admin_cancel: "bookings", admin_slots: "bookings", admin_book: "bookings", admin_customer_by_chart: "bookings",   // lifeplus-chart-no-v1
+  admin_reschedule: "bookings",   // lifeplus-booking-edit-v1
   admin_customers: "customers", admin_customer: "customers", admin_customer_update: "customers", admin_message: "customers",
   admin_customer_delete: "customers",
   // device-perms-v2: スタッフ・端末の管理と、設定。★お店の端末だけが持てる（LINE のスタッフは持てない：staff_perms_ok）
@@ -952,6 +953,7 @@ function bookingRow(r: any) {
     id: r.id, startsAt: s.toISOString(), date: jstDate(s), time: jstTime(s),
     endTime: jstTime(r.ends_at as Date), blockUntil: jstTime(r.block_until as Date),
     status: r.status, businessId: r.business_id, menuName: r.menu_name, durationMin: r.duration_min,
+    menuId: r.menu_id, allowOverlap: !!r.allow_overlap,   // lifeplus-booking-edit-v1
     priceYen: r.price_yen, symptoms: r.symptoms ?? [], source: r.source, outcomeNote: r.outcome_note,
     createdAt: (r.created_at as Date)?.toISOString?.() ?? null,
     customer: {
@@ -1113,6 +1115,41 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
     }
 
     // HIROさんが取り消す（患者さんに知らせるかは選べる）
+    case "admin_reschedule": {   // lifeplus-booking-edit-v1: 入れた予約（手入力・ネット）のメニュー・日・時間を変える
+      const id = str(body.bookingId, 40), menuId = str(body.menuId, 40);
+      const t = Date.parse(str(body.startsAt, 40));
+      if (!UUID_RE.test(id) || !UUID_RE.test(menuId) || Number.isNaN(t)) throw new ApiError("bad_request");
+      const ov = body.allowOverlap === true;
+      const mm = await sql`select id, business_id, duration_min, buffer_after_min, price_yen from menus where id = ${menuId}::uuid and is_active`;
+      if (!mm.length) throw new ApiError("menu_not_found");
+      const m = mm[0];
+      const at = new Date(t).toISOString();
+      const durMin = Number(m.duration_min), allMin = Number(m.duration_min) + Number(m.buffer_after_min);
+      let rows;
+      try {
+        rows = await sql`update bookings set menu_id = ${menuId}::uuid, business_id = ${m.business_id},
+            starts_at = ${at}::timestamptz,
+            ends_at = ${at}::timestamptz + make_interval(mins => ${durMin}::int),
+            block_until = ${at}::timestamptz + make_interval(mins => ${allMin}::int),
+            price_yen = ${m.price_yen}, allow_overlap = ${ov}
+          where id = ${id}::uuid and status in ('pending','confirmed') returning id`;
+      } catch (e) {
+        // ★ほかの予約とぶつかった（重なり止め）。重なっても入れるにしていなければここで止まる
+        const msg = String((e as Error).message);
+        if ((e as { code?: string }).code === "23P01" || msg.includes("bookings_no_overlap")) throw new ApiError("slot_not_available", 409);
+        throw e;
+      }
+      if (!rows.length) throw new ApiError("booking_not_found", 404);
+      let sent = false;
+      if (body.tellPatient) {
+        const b = await bookingFull(sql, id);
+        sent = await tellPatient(deps, b.line_user_id,
+          `【ご予約の変更】\nご予約を次のとおり変更しました。\n${whenText(b.starts_at)}\n${b.business_name}　${b.menu_name}` +
+          (str(body.message, 300) ? "\n" + str(body.message, 300) : "") + TAIL);
+      }
+      return { ok: true, sent };
+    }
+
     case "admin_cancel": {
       const id = str(body.bookingId, 40);
       if (!UUID_RE.test(id)) throw new ApiError("booking_not_found");
@@ -1302,6 +1339,7 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
       if (!DATE_RE.test(d) || !UUID_RE.test(menuId)) throw new ApiError("bad_request");
       const any = body.any === true;
       const ov = body.overlap === true;   // lifeplus-overlap-v1: ほかの予約と重なる時間も出す
+      const exceptId = UUID_RE.test(str(body.exceptId, 40)) ? str(body.exceptId, 40) : "";   // lifeplus-booking-edit-v1: 直している予約じしんは数えない
       const rows = await sql`
         with m as (select duration_min, buffer_after_min from menus where id = ${menuId}::uuid),
         h as (select kind, ((${d}::date + open_time) at time zone 'Asia/Tokyo') as op, ((${d}::date + close_time) at time zone 'Asia/Tokyo') as cl
@@ -1316,7 +1354,7 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
         c2 as (select distinct on (c.s) c.s, c.b, c.kind from c
                order by c.s, case c.kind when 'public' then 0 when 'staff' then 1 else 2 end)
         select c2.s, c2.kind, exists (
-          select 1 from bookings bk where bk.status in ('pending','confirmed')
+          select 1 from bookings bk where bk.status in ('pending','confirmed') and bk.id::text <> ${exceptId}
             and tstzrange(bk.starts_at, bk.block_until, '[)') && tstzrange(c2.s, c2.b, '[)')) as busy
         from c2
         order by c2.s`;

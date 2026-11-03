@@ -505,11 +505,12 @@
       h += '<p class="note">確定・取り消しなどは、HIROさんにお願いしてください。</p>';
     } else if (b.status === "pending") {
       h += '<div class="acts"><button class="btn mint" data-do="confirm">確定する</button><button class="btn gray" data-do="reject">お断りする</button></div>' +
+        '<div class="acts"><button class="btn" data-do="edit">内容を変える</button><button class="btn red" data-do="cancel">取り消す</button></div>' +   // lifeplus-booking-edit-v1
         '<p class="note">確定・お断りは、患者さんのLINEにすぐ届きます。</p>' +
         (can("customers") ? '<div class="danger-zone"><button class="link red" data-do="block">お断りしてブロック（営業など）</button></div>' : "");
     } else if (b.status === "confirmed" && !past) {
       h += '<div class="acts">' + (c.hasLine && can("customers") ? '<button class="btn line" data-do="msg">LINEで連絡</button>' : "") +
-        '<button class="btn red" data-do="cancel">取り消す</button></div>';
+        '<button class="btn" data-do="edit">内容を変える</button><button class="btn red" data-do="cancel">取り消す</button></div>';   // lifeplus-booking-edit-v1
     } else if (b.status === "confirmed" && past) {
       h += '<p class="note">来院されましたか？</p><div class="acts">' +
         '<button class="btn mint" data-do="done">来院</button><button class="btn gray" data-do="late_cancel">直前キャンセル</button><button class="btn red" data-do="no_show">無断キャンセル</button></div>';
@@ -537,6 +538,7 @@
           .then(done("お断りして、ブロックしました"));
       });
       if (k === "cancel") cancelSheet(b);
+      if (k === "edit") editSheet(b);   // lifeplus-booking-edit-v1
       if (k === "overlap") { closeSheet(); bookForm({ date: b.date, time: b.time, overlap: true }); }   // lifeplus-overlap-v2
       if (k === "msg") msgSheet(c);
       if (k === "done" || k === "no_show" || k === "late_cancel" || k === "redo") {
@@ -561,6 +563,71 @@
       '<button class="btn red wide" id="cfy">' + esc(label) + '</button><button class="btn gray wide" id="cfn">やめる</button>');
     $("#cfn").onclick = closeSheet;
     $("#cfy").onclick = function () { busy($("#cfy"), run()).catch(fail); };
+  }
+  /* lifeplus-booking-edit-v1: 入れた予約（手入力・ネット）の中身を変える。メニュー・日にち・時間 */
+  function editSheet(b) {
+    var c = b.customer, menus = A.init.menus, picked = null, date = b.date, want = b.time;
+    var menuOpts = A.init.businesses.map(function (bz) {
+      return '<optgroup label="' + esc(bz.name) + '">' + menus.filter(function (m) { return m.businessId === bz.id; }).map(function (m) {
+        return '<option value="' + esc(m.id) + '"' + (m.id === b.menuId ? " selected" : "") + ">" + esc(m.name) + "（" + m.durationMin + "分）</option>";
+      }).join("") + "</optgroup>";
+    }).join("");
+    openSheet("<h3>予約の内容を変える</h3>" +
+      '<p class="note">' + esc(c.name || "（名前なし）") + " さん　いまの予約：" + dayText(b.date) + " " + esc(b.time + "〜　" + b.menuName) +
+        (b.source === "admin" ? "" : "（ネットの予約）") + "</p>" +
+      '<label class="f"><span>メニュー</span><select id="em">' + menuOpts + "</select></label>" +
+      '<label class="f"><span>日にち</span><input type="date" id="ed" value="' + esc(b.date) + '"></label>' +
+      '<div class="f"><span>時間</span><div id="et"></div></div>' +
+      '<label class="check"><input type="checkbox" id="eany">受付時間の外も出す（知り合いなど）</label>' +
+      '<label class="check"><input type="checkbox" id="eov"' + (b.allowOverlap ? " checked" : "") + '>ほかの予約と時間が重なっても入れる（手入力だけ）</label>' +
+      (c.hasLine
+        ? '<label class="check"><input type="checkbox" id="etell" checked>患者さんのLINEに「ご予約の変更」を知らせる</label>' +
+          '<label class="f"><span>ひとこと（なくても大丈夫です）</span><textarea id="emsg" maxlength="300" placeholder="例：ご希望のとおり時間を変更しました。"></textarea></label>'
+        : '<p class="note">この方はLINEでつながっていません。変えたことはお電話などでお知らせください。</p>') +
+      (b.status === "pending" ? '<p class="note">確認待ちの予約は、変えても確認待ちのままです。</p>' : "") +
+      '<button class="btn mint wide" id="ego" disabled>この内容に変える</button><button class="btn gray wide" id="eno">やめる</button>');
+    function times() {
+      picked = null; $("#ego").disabled = true;
+      date = $("#ed").value;
+      if (!date) { $("#et").innerHTML = ""; return; }
+      $("#et").innerHTML = '<div class="spinner" aria-hidden="true" style="margin:8px auto"></div>';
+      api("admin_slots", { date: date, menuId: $("#em").value, any: $("#eany").checked, overlap: $("#eov").checked, exceptId: b.id }).then(function (r) {
+        var $t = $("#et"); if (!$t) return;
+        if (!r.slots.length) { $t.innerHTML = '<p class="note">この日は入れられる時間がありません。「受付時間の外も出す」「重なっても入れる」で、ほかの時間も選べます。</p>'; return; }
+        $t.innerHTML = '<div class="times">' + r.slots.map(function (s) {
+          var k = s.kind || "public";
+          return '<button class="time ' + esc(k === "public" ? "" : k) + (s.busy ? " busy" : "") + '" data-at="' + esc(s.startsAt) + '" data-t="' + esc(s.time) + '">' + esc(s.time) +
+            (k === "staff" ? '<b class="tk staff">手</b>' : k === "other" ? '<b class="tk other">外</b>' : "") + (s.busy ? '<b class="tk ov">重</b>' : "") + "</button>";
+        }).join("") + "</div>";
+        var pick = function (el) {
+          $$(".time", $t).forEach(function (x) { x.classList.toggle("on", x === el); });
+          picked = el.getAttribute("data-at"); $("#ego").disabled = false;
+        };
+        on(".time", pick, $t);
+        if (want) {
+          var w = $('[data-t="' + want + '"]', $t);
+          if (w) { pick(w); w.scrollIntoView({ block: "nearest" }); }
+          else if (date === b.date) {
+            // いまの時間が候補に無い（受付時間の外・重ねて入れた など）→ 出せるようにチェックを入れて引き直す
+            if (!$("#eany").checked) { $("#eany").checked = true; times(); return; }
+            if (!$("#eov").checked) { $("#eov").checked = true; times(); return; }
+          }
+          want = null;
+        }
+      }, fail);
+    }
+    $("#em").onchange = times; $("#ed").onchange = times; $("#eany").onchange = times; $("#eov").onchange = times;
+    $("#eno").onclick = function () { closeSheet(); };
+    $("#ego").onclick = function () {
+      if (!picked) return;
+      var p = { bookingId: b.id, menuId: $("#em").value, startsAt: picked, allowOverlap: $("#eov").checked,
+                tellPatient: !!($("#etell") && $("#etell").checked), message: $("#emsg") ? $("#emsg").value.trim() : "" };
+      busy($("#ego"), api("admin_reschedule", p)).then(function (r) {
+        closeSheet(); toast(r.sent ? "予約を変えて、LINEでお知らせしました" : "予約を変えました");
+        A.tab = "day"; loadDay(date);
+      }, fail);
+    };
+    times();
   }
   function cancelSheet(b) {
     var c = b.customer;
