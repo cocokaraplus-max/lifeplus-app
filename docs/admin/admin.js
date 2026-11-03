@@ -267,11 +267,11 @@
     var d = A.day, bs = d.bookings, live = bs.filter(function (b) { return b.status === "pending" || b.status === "confirmed"; });
     var hours = d.hours, sh = d.staffHours || [];   // lifeplus-hours-kind-v1
     var bar =
-      '<div class="day"><button class="arrow" id="dp" aria-label="前の日">‹</button>' +
+      '<div class="day"><button class="arrow" id="dp" aria-label="前の日"><i class=icl></i></button>' +
       "<h1>" + mdj(d.date) + "<small>（" + esc(d.weekday) + "）</small></h1>" +
       (d.date !== A.init.today ? '<button class="today-btn" id="dt">今日</button>' : "") +
       '<button class="today-btn" id="dm" aria-label="カレンダーで日を選ぶ">月</button>' +
-      '<button class="arrow" id="dn" aria-label="次の日">›</button></div>' +
+      '<button class="arrow" id="dn" aria-label="次の日"><i class=icr></i></button></div>' +
       '<div class="sub">' + (hours.length || sh.length ?
         (hours.length ? hours.map(function (h) { return h.open + "〜" + h.close; }).join("・") : "受付なし") +
         (sh.length ? '<span class="sub-staff">　手入力だけ ' + sh.map(function (h) { return h.open + "〜" + h.close; }).join("・") + "</span>" : "") +
@@ -290,7 +290,7 @@
       h += timeline(d);
       if (can("bookings") || can("closures")) h += '<p class="note">空いている枠を押すと、' + (can("bookings") && can("closures") ? "予約を入れたり×にしたり" : can("bookings") ? "予約を入れることが" : "×にすることが") + "できます。</p>";
     }
-    frame(bar, h, can("bookings") ? '<button class="fab" id="fab" aria-label="予約を手で入れる">＋</button>' : "");
+    frame(bar, h, can("bookings") ? '<button class="fab" id="fab" aria-label="予約を手で入れる" data-v="lifeplus-admin-ipad-v1"><i class=icp></i></button>' : "");
     $("#dp").onclick = function () { loadDay(addDays(A.date, -1)); };
     $("#dn").onclick = function () { loadDay(addDays(A.date, 1)); };
     if ($("#dt")) $("#dt").onclick = function () { loadDay(A.init.today); };
@@ -367,8 +367,8 @@
       if ($sheet.hidden) return;
       var y = Number(ym.slice(0, 4)), mo = Number(ym.slice(5, 7));
       var prev = ymdUTC(new Date(Date.UTC(y, mo - 2, 1))).slice(0, 7), next = ymdUTC(new Date(Date.UTC(y, mo, 1))).slice(0, 7);
-      var h = '<div class="cal-head"><button class="cal-nav" id="mp" aria-label="前の月">‹</button>' +
-        '<span class="cal-title">' + y + "年" + mo + '月</span><button class="cal-nav" id="mn" aria-label="次の月">›</button></div><div class="cal-grid">';
+      var h = '<div class="cal-head"><button class="cal-nav" id="mp" aria-label="前の月"><i class=icl></i></button>' +
+        '<span class="cal-title">' + y + "年" + mo + '月</span><button class="cal-nav" id="mn" aria-label="次の月"><i class=icr></i></button></div><div class="cal-grid">';
       WD.forEach(function (w, i) { h += '<span class="cal-wd' + (i === 0 ? " sun" : i === 6 ? " sat" : "") + '">' + w + "</span>"; });
       for (var i = 0; i < r.lead; i++) h += "<span></span>";
       r.days.forEach(function (d) {
@@ -616,9 +616,9 @@
         '<button class="btn gray small" id="pcancel">やめる</button></div>'
       : '<button class="btn wide range-btn" id="prange">期間で休みを入れる（お盆・年末年始など）</button>') +
       '<div class="card' + (pk ? " picking" : "") + '"><div class="cal-head">' +
-      '<button class="cal-nav" id="pm" aria-label="前の月"' + (ym <= thisMonth ? " disabled" : "") + ">‹</button>" +
+      '<button class="cal-nav" id="pm" aria-label="前の月"' + (ym <= thisMonth ? " disabled" : "") + "><i class=icl></i></button>" +
       '<span class="cal-title">' + y + "年" + mo + "月</span>" +
-      '<button class="cal-nav" id="nm" aria-label="次の月">›</button></div><div class="cal-grid">';
+      '<button class="cal-nav" id="nm" aria-label="次の月"><i class=icr></i></button></div><div class="cal-grid">';
     WD.forEach(function (w, i) { h += '<span class="cal-wd' + (i === 0 ? " sun" : i === 6 ? " sat" : "") + '">' + w + "</span>"; });
     for (var i = 0; i < lead; i++) h += "<span></span>";
     for (var dd = 1; dd <= days; dd++) {

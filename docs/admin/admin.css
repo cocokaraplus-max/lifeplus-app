@@ -303,3 +303,25 @@ button.cal-d.none:hover { background: #f3f5f9; }
 .sw.ex { background: var(--mint-soft); border: 2px solid var(--mint); }
 .note.warn { color: #9a5b00; background: #fff7e6; border-radius: 8px; padding: 6px 10px; }
 .cal-d.none i { color: #9aa3b5; font-weight: 700; }
+
+/* ---------- iPad：ボタンの絵を真ん中に・押した反応を速く  marker: lifeplus-admin-ipad-v1 ---------- */
+/* 2回たたいて拡大を待たない（押してすぐ反応する） */
+html, button, a, input, select, textarea, label { touch-action: manipulation; }
+button, a { -webkit-tap-highlight-color: rgba(29, 78, 216, .18); }
+/* ＋ ‹ › × は文字ではなく絵（CSSで描く）。丸の真ん中に置く */
+.fab, .arrow, .cal-nav, .sheet-x { display: inline-grid; place-items: center; padding: 0; line-height: 0; }
+.fab { display: grid; }
+.icp, .icx { position: relative; display: block; width: 26px; height: 26px; pointer-events: none; }
+.icp::before, .icp::after, .icx::before, .icx::after { content: ""; position: absolute; left: 50%; top: 50%; width: 100%; height: 3.2px; margin: -1.6px 0 0 -50%; border-radius: 2px; background: currentColor; }
+.icp::after { transform: rotate(90deg); }
+.icx { width: 18px; height: 18px; }
+.icx::before, .icx::after { height: 2.8px; margin-top: -1.4px; }
+.icx::before { transform: rotate(45deg); } .icx::after { transform: rotate(-45deg); }
+.icl, .icr { display: block; width: 11px; height: 11px; border-left: 2.8px solid currentColor; border-bottom: 2.8px solid currentColor; border-radius: 1px; pointer-events: none; }
+.icl { transform: translateX(2px) rotate(45deg); }
+.icr { transform: translateX(-2px) rotate(-135deg); }
+.cal-nav[disabled] { opacity: .35; }
+/* お知らせの帯は＋の上に重なるので、押せないものにする（下のボタンに届くように） */
+.toast { pointer-events: none; }
+/* 押したとき、押せたことが分かるように少し沈ませる */
+.fab:active, .arrow:active, .cal-nav:active, .today-btn:active, .tabs button:active { transform: scale(.94); }
