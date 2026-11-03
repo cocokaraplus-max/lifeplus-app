@@ -107,6 +107,11 @@
   function mds(ymd) { var p = ymd.split("-"); return Number(p[1]) + "/" + Number(p[2]); }
   function dayText(ymd) { return mdj(ymd) + "（" + WD[wdOf(ymd)] + "）"; }
   function yen(n) { return n == null ? "保険診療" : Number(n).toLocaleString("ja-JP") + "円"; }
+  /* lifeplus-jiyu-menu-v1: 料金の出し方。料金が無いメニューのうち、保険外（自由診療）は「施術内容により異なります」 */
+  function priceText(n, name) {
+    if (n != null) return Number(n).toLocaleString("ja-JP") + "円";
+    return /保険外|自由診療|自費/.test(String(name || "")) ? "施術内容により異なります" : "保険診療";
+  }
   function telHref(p) { return "tel:" + String(p || "").replace(/[^0-9+]/g, ""); }
   function telText(p) {
     var d = String(p || "").replace(/[^0-9]/g, "");
@@ -465,7 +470,7 @@
       '<dl class="facts">' +
         "<div><dt>日時</dt><dd>" + dayText(b.date) + " " + esc(b.time + "〜" + b.endTime) + "</dd></div>" +
         "<div><dt>メニュー</dt><dd>" + esc(bizName(b.businessId)) + "<br>" + esc(b.menuName) + "</dd></div>" +
-        "<div><dt>料金</dt><dd>" + yen(b.priceYen) + "</dd></div>" +
+        "<div><dt>料金</dt><dd>" + priceText(b.priceYen, b.menuName) + "</dd></div>" +
         (b.symptoms.length ? "<div><dt>気になる所</dt><dd>" + esc(b.symptoms.join("・")) + "</dd></div>" : "") +
         "<div><dt>電話</dt><dd>" + (c.phone ? '<a href="' + esc(telHref(c.phone)) + '">' + esc(telText(c.phone)) + "</a>" : "なし") + "</dd></div>" +
         "<div><dt>LINE名</dt><dd>" + (c.hasLine ? esc(c.lineName || "（あり）") : "LINEなし") + "</dd></div>" +
