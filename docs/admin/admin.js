@@ -49,6 +49,7 @@
     customer_blocked: "ブロック中のお客さまです。先にブロックを外してください。",
     name_required: "お名前を入れてください。",
     phone_invalid: "電話番号は数字10〜11桁で入れてください。",
+    kana_invalid: "フリガナはカタカナ（ひらがなでも可）で入れてください。",   // lifeplus-cust-edit-v1
     menu_not_found: "このメニューは使えません。",
     message_required: "送る文を入れてください。",
     no_line: "このお客さまはLINEでつながっていないため送れません。",
@@ -859,17 +860,23 @@
     }, fail);
   }
   /* lifeplus-chart-no-v1: カルテ番号を直す（間違えて登録したとき）。空にして保存すると消える */
-  function chartSheet(c) {
-    openSheet("<h3>カルテ番号を直す</h3><p class=\"note\">" + esc(c.name) + " さん</p>" +
-      '<label class="f"><span>カルテ番号（消すときは空にして保存）</span><input id="cno" inputmode="numeric" maxlength="20" autocomplete="off" value="' + esc(c.chartNo || "") + '"></label>' +
+  function chartSheet(c) {   // lifeplus-cust-edit-v1: お名前・フリガナ・電話番号・カルテ番号をまとめて直す
+    openSheet("<h3>お客さまの情報を直す</h3>" +
+      '<label class="f"><span>お名前</span><input id="ceN" maxlength="30" autocomplete="off" enterkeyhint="next" value="' + esc(c.name || "") + '"></label>' +
+      '<label class="f"><span>フリガナ（ひらがなでも可）</span><input id="ceK" maxlength="40" autocomplete="off" enterkeyhint="next" value="' + esc(c.kana || "") + '"></label>' +
+      '<label class="f"><span>電話番号（消すときは空に）</span><input id="ceP" type="tel" inputmode="tel" maxlength="15" autocomplete="off" enterkeyhint="next" value="' + esc(c.phone || "") + '"></label>' +
+      '<label class="f"><span>カルテ番号（消すときは空に）</span><input id="cno" inputmode="numeric" maxlength="20" autocomplete="off" enterkeyhint="done" value="' + esc(c.chartNo || "") + '"></label>' +
+      (c.hasLine ? '<p class="note">LINEで予約された方は、ご本人が登録した内容を書きかえることになります。</p>' : "") +
       '<button class="btn mint wide" id="cnok">保存する</button><button class="btn gray wide" id="cnno">やめる</button>');
-    $("#cno").focus();
     $("#cnno").onclick = function () { closeSheet(); custSheet(c.id); };
     $("#cnok").onclick = function () {
-      var v = $("#cno").value.trim();
-      busy($("#cnok"), api("admin_customer_update", { customerId: c.id, chartNo: v })).then(function () {
-        c.chartNo = v.normalize ? v.normalize("NFKC").replace(/\s+/g, "") : v;
-        toast(v ? "カルテ番号を直しました" : "カルテ番号を消しました");
+      var a = document.activeElement; if (a && a.blur) a.blur();
+      var p = { customerId: c.id, name: $("#ceN").value.trim(), nameKana: $("#ceK").value.trim(), phone: $("#ceP").value.trim(), chartNo: $("#cno").value.trim() };
+      if (!p.name) { toast(ERR.name_required); return; }
+      busy($("#cnok"), api("admin_customer_update", p)).then(function (r) {
+        var n = (r && r.customer) || {};
+        c.name = n.name || p.name; c.kana = n.kana != null ? n.kana : p.nameKana; c.phone = n.phone != null ? n.phone : p.phone; c.chartNo = n.chartNo != null ? n.chartNo : p.chartNo;
+        toast("お客さまの情報を直しました");
         closeSheet(); if (A.tab === "cust") loadCust(); custSheet(c.id);
       }, fail);
     };
@@ -885,6 +892,7 @@
       return api("admin_customer", { customerId: id }).then(function (hst) {
         A.hist = hst.bookings;
         openSheet("<h3>" + esc(c.name) + "</h3>" + (c.kana ? '<div class="kana">' + esc(c.kana) + "</div>" : "") +
+          (can("customers") ? '<button class="btn small" id="tce" style="margin:6px 0 2px">お名前・フリガナ・電話・カルテ番号を直す</button>' : "") +   // lifeplus-cust-edit-v1
           '<div class="counts"><span class="pill reg">来院 ' + c.visits + "回</span>" +
             (c.noShows ? '<span class="pill ns">無断 ' + c.noShows + "回</span>" : "") +
             (c.lateCancels ? '<span class="pill ns">直前取消 ' + c.lateCancels + "回</span>" : "") + "</div>" +
@@ -913,6 +921,7 @@
         };
         if ($("#tl")) $("#tl").onclick = function () { msgSheet(c); };
         if ($("#tcn")) $("#tcn").onclick = function () { chartSheet(c); };   // lifeplus-chart-no-v1
+        if ($("#tce")) $("#tce").onclick = function () { chartSheet(c); };   // lifeplus-cust-edit-v1
         if ($("#tdel")) $("#tdel").onclick = function () {
           var n = hst.bookings.length;
           confirmSheet("「" + c.name + "」を消しますか？", "名簿から消え、予約の履歴" + (n ? " " + n + "件" : "") + "もすべて消えます。元に戻せません。" +
@@ -958,10 +967,10 @@
       } else {
         $("#who").innerHTML = '<label class="f"><span>カルテ番号（入れると登録済みの方を呼び出します・任意）</span><input id="bc" inputmode="numeric" maxlength="20" autocomplete="off" placeholder="例：1234"></label>' +
           '<div class="note" id="bcmsg" style="margin-top:-4px"></div>' +   // lifeplus-chart-no-v1
-          '<label class="f"><span>お名前' + (can("customers") ? "（名簿にいる方は候補から選べます）" : "") + '</span><input id="bn" maxlength="30" autocomplete="off" placeholder="例：山田 花子"></label>' +
+          '<label class="f"><span>お名前' + (can("customers") ? "（名簿にいる方は候補から選べます）" : "") + '</span><input id="bn" maxlength="30" autocomplete="off" enterkeyhint="next" placeholder="例：山田 花子"></label>' +
           '<div id="sug"></div>' +
-          '<label class="f"><span>フリガナ</span><input id="bk" maxlength="40" placeholder="ヤマダ ハナコ"></label>' +
-          '<label class="f"><span>電話番号</span><input id="bp" type="tel" inputmode="tel" maxlength="15" placeholder="090-1234-5678"></label>';
+          '<label class="f"><span>フリガナ</span><input id="bk" maxlength="40" autocomplete="off" enterkeyhint="next" placeholder="ヤマダ ハナコ"></label>' +
+          '<label class="f"><span>電話番号</span><input id="bp" type="tel" inputmode="tel" maxlength="15" autocomplete="off" enterkeyhint="done" placeholder="090-1234-5678"></label>';
         /* lifeplus-chart-no-v1: カルテ番号を入れたら、その方を呼び出す（お名前・電話が入った状態になる） */
         var tc;
         $("#bc").oninput = function () {
@@ -1492,6 +1501,57 @@
 
   // 画面に戻ってきたら最新にする
   document.addEventListener("visibilitychange", function () { if (!document.hidden && A.init && $sheet.hidden) refresh(); });
+
+  /* ===== lifeplus-cust-edit-v1: iPadのキーボード =====
+     ・下から出る画面をキーボードの上にのせる（visualViewport でキーボードの高さを知る）
+     ・欄を押している間は「キーボードを閉じる」を出す
+     ・1行の欄で［改行］→ 次の欄へ（最後ならキーボードを閉じる） */
+  (function () {
+    var vv = window.visualViewport;
+    var kb = document.createElement("button");
+    kb.type = "button"; kb.className = "kbd-close"; kb.hidden = true; kb.textContent = "キーボードを閉じる";
+    document.body.appendChild(kb);
+    kb.addEventListener("mousedown", function (e) { e.preventDefault(); });
+    kb.addEventListener("touchstart", function (e) { e.preventDefault(); kb.click(); }, { passive: false });
+    kb.onclick = function () { var a = document.activeElement; if (a && a.blur) a.blur(); kb.hidden = true; fit(); };
+    function isField(el) {
+      if (!el) return false;
+      if (el.tagName === "TEXTAREA") return true;
+      if (el.tagName !== "INPUT") return false;
+      return !/^(checkbox|radio|button|submit|range|color|file|date|month|time)$/i.test(el.type || "");
+    }
+    function zoomNow() { var z = Number(getComputedStyle(document.documentElement).getPropertyValue("--text-zoom")) || 1; return z; }
+    function fit() {
+      var sh = document.querySelector("#sheet .sheet");
+      var gap = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
+      var on = isField(document.activeElement);
+      if (sh) {
+        var z = zoomNow();
+        if (gap > 60) { sh.style.bottom = (gap / z) + "px"; sh.style.maxHeight = ((vv.height - 12) / z) + "px"; }
+        else { sh.style.bottom = ""; sh.style.maxHeight = ""; }
+      }
+      kb.hidden = !on;
+      kb.style.bottom = (gap > 60 ? gap + 10 : 18) + "px";
+    }
+    if (vv) { vv.addEventListener("resize", fit); vv.addEventListener("scroll", fit); }
+    document.addEventListener("focusin", function (e) {
+      if (!isField(e.target)) { fit(); return; }
+      fit();
+      setTimeout(function () { fit(); try { e.target.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (_) { e.target.scrollIntoView(); } }, 320);
+    });
+    document.addEventListener("focusout", function () { setTimeout(fit, 120); });
+    document.addEventListener("keydown", function (e) {
+      var el = e.target;
+      if (e.key !== "Enter" || e.isComposing || !el || el.tagName !== "INPUT" || !isField(el)) return;
+      var box = el.closest("#sheet") || el.closest("main"); if (!box) return;
+      var list = Array.prototype.filter.call(box.querySelectorAll("input, textarea, select"), function (x) {
+        return !x.disabled && x.offsetParent !== null && (isField(x) || x.tagName === "SELECT");
+      });
+      var i = list.indexOf(el);
+      e.preventDefault();
+      if (i >= 0 && i < list.length - 1) list[i + 1].focus(); else el.blur();
+    });
+  })();
 
   // ---------- 起動 ----------
   function start() {

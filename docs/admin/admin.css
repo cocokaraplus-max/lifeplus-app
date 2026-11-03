@@ -325,3 +325,9 @@ button, a { -webkit-tap-highlight-color: rgba(29, 78, 216, .18); }
 .toast { pointer-events: none; }
 /* 押したとき、押せたことが分かるように少し沈ませる */
 .fab:active, .arrow:active, .cal-nav:active, .today-btn:active, .tabs button:active { transform: scale(.94); }
+
+/* ---------- iPadのキーボード  marker: lifeplus-cust-edit-v1 ---------- */
+.kbd-close { position: fixed; right: 14px; bottom: 18px; z-index: 40; border: 0; border-radius: 999px; padding: 10px 16px;
+  background: var(--ink); color: #fff; font-size: 14px; font-weight: 700; box-shadow: 0 6px 18px rgba(30, 42, 74, .3); touch-action: manipulation; }
+.kbd-close[hidden] { display: none; }
+.sheet { transition: bottom .15s ease-out; }

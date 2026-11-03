@@ -1176,7 +1176,20 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
           if (dup.length) throw new ApiError("chart_dup", 409);
         }
       }
-      await sql`update customers set is_returning = ${isReturning}, is_blocked = ${isBlocked}, memo = ${memo}, chart_no = ${chart} where id = ${id}::uuid`;
+      // lifeplus-cust-edit-v1: お名前・フリガナ・電話番号も直す（送られてきたものだけ。空にすると消す。お名前は消せない）
+      let nm = c.name, kanaV = c.name_kana, phoneV = c.phone;
+      if (typeof body.name === "string") { nm = str(body.name, 30); if (!nm) throw new ApiError("name_required"); }
+      if (typeof body.nameKana === "string") {
+        kanaV = body.nameKana.trim() ? normalizeKana(body.nameKana) : null;
+        if (body.nameKana.trim() && !kanaV) throw new ApiError("kana_invalid");
+      }
+      if (typeof body.phone === "string") {
+        phoneV = body.phone.trim() ? normalizePhone(body.phone) : null;
+        if (body.phone.trim() && !phoneV) throw new ApiError("phone_invalid");
+      }
+      await sql`update customers set is_returning = ${isReturning}, is_blocked = ${isBlocked}, memo = ${memo}, chart_no = ${chart},
+                name = ${nm}, name_kana = ${kanaV}, phone = ${phoneV} where id = ${id}::uuid`;
+      return { ok: true, customer: { name: nm, kana: kanaV ?? "", phone: phoneV ?? "", chartNo: chart ?? "" } };
       return { ok: true };
     }
 
