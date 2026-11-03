@@ -160,6 +160,12 @@ async function openDayOf(tx: Sql, d: string, onlyId?: string) {
   return rows.length;
 }
 
+// lifeplus-chart-no-v1: カルテ番号（全角→半角・空白なし・20文字まで）。空は null
+function chartNo(v: unknown): string | null {
+  const s = String(v ?? "").normalize("NFKC").replace(/\s+/g, "").slice(0, 20);
+  return s || null;
+}
+
 // ---------- 管理画面を使える人  marker: staff-perms-v1 ----------
 export const PERMS = ["closures", "bookings", "customers", "notify", "site"] as const;   // lifeplus-site-cms-v1: site＝ホームページの変更
 // 操作ごとに要る権限（null は全員、owner はHIROさんだけ）
@@ -167,7 +173,7 @@ const PERM_OF: Record<string, string | null> = {
   admin_init: null, admin_day: null, admin_month: null, admin_pending: null,
   admin_closures: "closures", admin_closure_add: "closures", admin_closure_del: "closures", admin_closure_update: "closures",   // lifeplus-closure-notice-v1
   admin_extra_add: "closures", admin_extra_del: "closures", admin_closure_open_day: "closures",   // lifeplus-extra-hours-v1
-  admin_decide: "bookings", admin_outcome: "bookings", admin_cancel: "bookings", admin_slots: "bookings", admin_book: "bookings",
+  admin_decide: "bookings", admin_outcome: "bookings", admin_cancel: "bookings", admin_slots: "bookings", admin_book: "bookings", admin_customer_by_chart: "bookings",   // lifeplus-chart-no-v1
   admin_customers: "customers", admin_customer: "customers", admin_customer_update: "customers", admin_message: "customers",
   admin_customer_delete: "customers",
   // device-perms-v2: スタッフ・端末の管理と、設定。★お店の端末だけが持てる（LINE のスタッフは持てない：staff_perms_ok）
@@ -1129,13 +1135,13 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
       const digits = q.replace(/[^0-9]/g, "");
       const filter = str(body.filter, 20);
       const rows = await sql`
-        select c.id, c.name, c.name_kana, c.phone, c.line_name, c.line_user_id, c.is_returning, c.is_blocked, c.memo,
+        select c.id, c.name, c.name_kana, c.phone, c.line_name, c.line_user_id, c.is_returning, c.is_blocked, c.memo, c.chart_no,
                st.visits, st.no_shows, st.late_cancels,
                (select min(starts_at) from bookings b where b.customer_id = c.id and b.status in ('pending','confirmed') and b.starts_at > ${now.toISOString()}::timestamptz) as next_at,
                (select max(starts_at) from bookings b where b.customer_id = c.id and b.status = 'done') as last_at
         from customers c left join customer_stats st on st.customer_id = c.id
         where c.name is not null
-          and (${q} = '' or c.name ilike ${like} or c.name_kana ilike ${like} or c.line_name ilike ${like} or (${digits} <> '' and c.phone like ${"%" + digits + "%"}))
+          and (${q} = '' or c.name ilike ${like} or c.name_kana ilike ${like} or c.line_name ilike ${like} or (${digits} <> '' and c.phone like ${"%" + digits + "%"}) or (${q} <> '' and c.chart_no = ${q.replace(/\s+/g, "")}))
           and (${filter} = '' or (${filter} = 'returning' and c.is_returning and not c.is_blocked)
                or (${filter} = 'new' and not c.is_returning and not c.is_blocked)
                or (${filter} = 'blocked' and c.is_blocked)
@@ -1145,7 +1151,7 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
       return {
         customers: rows.map((c: Record<string, unknown>) => ({
           id: c.id, name: c.name, kana: c.name_kana ?? "", phone: c.phone ?? "", lineName: c.line_name ?? "", hasLine: !!c.line_user_id,
-          isReturning: !!c.is_returning, isBlocked: !!c.is_blocked, memo: c.memo ?? "",
+          isReturning: !!c.is_returning, isBlocked: !!c.is_blocked, memo: c.memo ?? "", chartNo: c.chart_no ?? "",
           visits: Number(c.visits ?? 0), noShows: Number(c.no_shows ?? 0), lateCancels: Number(c.late_cancels ?? 0),
           next: c.next_at ? whenText(c.next_at as Date) : "", last: c.last_at ? md(jstDate(c.last_at as Date)) : "",
         })),
@@ -1161,8 +1167,26 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
       const isReturning = typeof body.isReturning === "boolean" ? body.isReturning : c.is_returning;
       const isBlocked = typeof body.isBlocked === "boolean" ? body.isBlocked : c.is_blocked;
       const memo = typeof body.memo === "string" ? str(body.memo, 500) : c.memo;
-      await sql`update customers set is_returning = ${isReturning}, is_blocked = ${isBlocked}, memo = ${memo} where id = ${id}::uuid`;
+      // lifeplus-chart-no-v1: カルテ番号を直す（空で消す）。★同じ番号の方がほかにいれば止める
+      let chart = c.chart_no ?? null;
+      if (typeof body.chartNo === "string") {
+        chart = chartNo(body.chartNo);
+        if (chart) {
+          const dup = await sql`select id from customers where chart_no = ${chart} and id <> ${id}::uuid limit 1`;
+          if (dup.length) throw new ApiError("chart_dup", 409);
+        }
+      }
+      await sql`update customers set is_returning = ${isReturning}, is_blocked = ${isBlocked}, memo = ${memo}, chart_no = ${chart} where id = ${id}::uuid`;
       return { ok: true };
+    }
+
+    case "admin_customer_by_chart": {   // lifeplus-chart-no-v1: カルテ番号で、登録済みの方を呼び出す
+      const no = chartNo(body.chartNo);
+      if (!no) return { customer: null };
+      const r = await sql`select id, name, name_kana, phone, line_user_id, is_blocked, chart_no from customers where chart_no = ${no} limit 1`;
+      const c = r[0];
+      return { customer: c ? { id: c.id, name: c.name, kana: c.name_kana ?? "", phone: c.phone ?? "", hasLine: !!c.line_user_id,
+                               isBlocked: !!c.is_blocked, chartNo: c.chart_no } : null };
     }
 
     case "admin_customer": {
@@ -1294,8 +1318,20 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
         const phone = body.phone ? normalizePhone(body.phone) : null;
         if (body.phone && !phone) throw new ApiError("phone_invalid");
         const kana = body.nameKana ? normalizeKana(body.nameKana) : null;
-        const r = await sql`insert into customers (name, name_kana, phone) values (${name}, ${kana}, ${phone}) returning id`;
+        // lifeplus-chart-no-v1: カルテ番号つきで登録（ほかの方の番号なら止める）
+        const chart = chartNo(body.chartNo);
+        if (chart) {
+          const dup = await sql`select id from customers where chart_no = ${chart} limit 1`;
+          if (dup.length) throw new ApiError("chart_dup", 409);
+        }
+        const r = await sql`insert into customers (name, name_kana, phone, chart_no) values (${name}, ${kana}, ${phone}, ${chart}) returning id`;
         custId = r[0].id;
+      } else if (chartNo(body.chartNo)) {
+        // lifeplus-chart-no-v1: 番号がまだ無い方に、この予約で番号を付ける（もう番号がある方は変えない。直すのはお客さまの画面）
+        const chart = chartNo(body.chartNo);
+        const dup = await sql`select id from customers where chart_no = ${chart} and id <> ${custId}::uuid limit 1`;
+        if (dup.length) throw new ApiError("chart_dup", 409);
+        await sql`update customers set chart_no = ${chart} where id = ${custId}::uuid and chart_no is null`;
       }
       let id: string;
       try {

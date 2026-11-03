@@ -41,6 +41,7 @@
     booking_not_pending: "この予約はもう確認済みです。",
     booking_not_found: "この予約は見つかりませんでした。",
     customer_not_found: "このお客さまは見つかりませんでした。",
+    chart_dup: "このカルテ番号は、ほかの方に使われています。番号を確かめてください。",   // lifeplus-chart-no-v1
     closure_not_found: "この休みは見つかりませんでした。もう外されているかもしれません。",   // lifeplus-closure-notice-v1
     extra_overlap: "この日は、その時間にもう臨時の受付が入っています。",   // lifeplus-extra-hours-v1
     extra_not_found: "この臨時の受付は見つかりませんでした。もう外されているかもしれません。",
@@ -833,7 +834,7 @@
   function showCustomers() {
     var chips = [["", "全員"], ["returning", "通院中"], ["new", "初めて"], ["noshow", "無断あり"], ["blocked", "ブロック"]];
     frame('<div class="day"><h1 class="title">お客さま</h1></div>',
-      '<input class="search" id="q" type="search" placeholder="名前・フリガナ・電話番号で探す" value="' + esc(A.q) + '" aria-label="お客さまを探す">' +
+      '<input class="search" id="q" type="search" placeholder="名前・フリガナ・電話番号・カルテ番号で探す" value="' + esc(A.q) + '" aria-label="お客さまを探す">' +
       '<div class="chips">' + chips.map(function (c) { return '<button class="chip' + (A.filter === c[0] ? " on" : "") + '" data-f="' + c[0] + '">' + c[1] + "</button>"; }).join("") + "</div>" +
       '<div class="card" id="cl" style="padding:4px 12px"><div class="boot" style="padding:20px 0"><div class="spinner" aria-hidden="true"></div></div></div>' +
       '<button class="btn mint wide" id="nb">LINEのない方の予約を入れる（電話・来院）</button>');
@@ -852,10 +853,26 @@
         var pill = c.isBlocked ? '<span class="pill blk">ブロック</span>' : c.noShows ? '<span class="pill ns">無断' + c.noShows + "</span>" : c.isReturning ? '<span class="pill reg">通院中</span>' : '<span class="pill new">初めて</span>';
         return '<button class="cust" data-c="' + esc(c.id) + '"><span class="av' + (c.isBlocked ? " blk" : "") + '">' + esc((c.name || "？").slice(0, 1)) + "</span>" +
           '<span class="g"><span class="nm">' + esc(c.name) + "</span><br>" +
-          '<span class="sb">' + esc([c.kana, c.next ? "次回 " + c.next : c.last ? "前回 " + c.last : "", c.hasLine ? "" : "LINEなし"].filter(Boolean).join("　")) + "</span></span>" + pill + "</button>";
+          '<span class="sb">' + esc([c.chartNo ? "No." + c.chartNo : "", c.kana, c.next ? "次回 " + c.next : c.last ? "前回 " + c.last : "", c.hasLine ? "" : "LINEなし"].filter(Boolean).join("　")) + "</span></span>" + pill + "</button>";
       }).join("") : '<div class="empty">見つかりませんでした。</div>';
       on("[data-c]", function (el) { custSheet(el.getAttribute("data-c")); }, $cl);
     }, fail);
+  }
+  /* lifeplus-chart-no-v1: カルテ番号を直す（間違えて登録したとき）。空にして保存すると消える */
+  function chartSheet(c) {
+    openSheet("<h3>カルテ番号を直す</h3><p class=\"note\">" + esc(c.name) + " さん</p>" +
+      '<label class="f"><span>カルテ番号（消すときは空にして保存）</span><input id="cno" inputmode="numeric" maxlength="20" autocomplete="off" value="' + esc(c.chartNo || "") + '"></label>' +
+      '<button class="btn mint wide" id="cnok">保存する</button><button class="btn gray wide" id="cnno">やめる</button>');
+    $("#cno").focus();
+    $("#cnno").onclick = function () { closeSheet(); custSheet(c.id); };
+    $("#cnok").onclick = function () {
+      var v = $("#cno").value.trim();
+      busy($("#cnok"), api("admin_customer_update", { customerId: c.id, chartNo: v })).then(function () {
+        c.chartNo = v.normalize ? v.normalize("NFKC").replace(/\s+/g, "") : v;
+        toast(v ? "カルテ番号を直しました" : "カルテ番号を消しました");
+        closeSheet(); if (A.tab === "cust") loadCust(); custSheet(c.id);
+      }, fail);
+    };
   }
   function custSheet(id) {
     var get = A.custs && A.custs.filter(function (x) { return x.id === id; })[0];
@@ -871,7 +888,9 @@
           '<div class="counts"><span class="pill reg">来院 ' + c.visits + "回</span>" +
             (c.noShows ? '<span class="pill ns">無断 ' + c.noShows + "回</span>" : "") +
             (c.lateCancels ? '<span class="pill ns">直前取消 ' + c.lateCancels + "回</span>" : "") + "</div>" +
-          '<dl class="facts"><div><dt>電話</dt><dd>' + (c.phone ? '<a href="' + esc(telHref(c.phone)) + '">' + esc(telText(c.phone)) + "</a>" : "なし") + "</dd></div>" +
+          '<dl class="facts"><div><dt>カルテ番号</dt><dd>' + (c.chartNo ? esc(c.chartNo) : "なし") +
+            (can("customers") ? ' <button class="link" id="tcn" style="margin-left:10px">直す</button>' : "") + '</dd></div>' +   // lifeplus-chart-no-v1
+          '<div><dt>電話</dt><dd>' + (c.phone ? '<a href="' + esc(telHref(c.phone)) + '">' + esc(telText(c.phone)) + "</a>" : "なし") + "</dd></div>" +
           "<div><dt>LINE名</dt><dd>" + (c.hasLine ? esc(c.lineName || "（あり）") : "LINEなし") + "</dd></div>" +
           (c.next ? "<div><dt>次回</dt><dd>" + esc(c.next) + "</dd></div>" : "") + "</dl>" +
           '<label class="toggle"><span><b>通院中</b><br><span class="note" style="margin:0">オンにすると、予約がすぐ確定になります</span></span><input type="checkbox" id="tr"' + (c.isReturning ? " checked" : "") + ' style="width:26px;height:26px"></label>' +
@@ -893,6 +912,7 @@
           }, fail);
         };
         if ($("#tl")) $("#tl").onclick = function () { msgSheet(c); };
+        if ($("#tcn")) $("#tcn").onclick = function () { chartSheet(c); };   // lifeplus-chart-no-v1
         if ($("#tdel")) $("#tdel").onclick = function () {
           var n = hst.bookings.length;
           confirmSheet("「" + c.name + "」を消しますか？", "名簿から消え、予約の履歴" + (n ? " " + n + "件" : "") + "もすべて消えます。元に戻せません。" +
@@ -932,13 +952,29 @@
     function drawWho() {
       if (cust) {
         $("#who").innerHTML = '<dl class="facts" style="margin-top:6px"><div><dt>お客さま</dt><dd>' + esc(cust.name) + (cust.phone ? "<br>" + esc(telText(cust.phone)) : "") +
-          '</dd></div></dl><button class="link" id="wch">別の人にする</button>';
+          '</dd></div>' + (cust.chartNo ? '<div><dt>カルテ番号</dt><dd>' + esc(cust.chartNo) + '</dd></div>' : '') + '</dl><button class="link" id="wch">別の人にする</button>' +
+          (cust.chartNo ? '' : '<label class="f"><span>カルテ番号（この方にまだ無ければ付けられます・任意）</span><input id="bc2" inputmode="numeric" maxlength="20" autocomplete="off"></label>');   // lifeplus-chart-no-v1
         $("#wch").onclick = function () { cust = null; drawWho(); };
       } else {
-        $("#who").innerHTML = '<label class="f"><span>お名前' + (can("customers") ? "（名簿にいる方は候補から選べます）" : "") + '</span><input id="bn" maxlength="30" autocomplete="off" placeholder="例：山田 花子"></label>' +
+        $("#who").innerHTML = '<label class="f"><span>カルテ番号（入れると登録済みの方を呼び出します・任意）</span><input id="bc" inputmode="numeric" maxlength="20" autocomplete="off" placeholder="例：1234"></label>' +
+          '<div class="note" id="bcmsg" style="margin-top:-4px"></div>' +   // lifeplus-chart-no-v1
+          '<label class="f"><span>お名前' + (can("customers") ? "（名簿にいる方は候補から選べます）" : "") + '</span><input id="bn" maxlength="30" autocomplete="off" placeholder="例：山田 花子"></label>' +
           '<div id="sug"></div>' +
           '<label class="f"><span>フリガナ</span><input id="bk" maxlength="40" placeholder="ヤマダ ハナコ"></label>' +
           '<label class="f"><span>電話番号</span><input id="bp" type="tel" inputmode="tel" maxlength="15" placeholder="090-1234-5678"></label>';
+        /* lifeplus-chart-no-v1: カルテ番号を入れたら、その方を呼び出す（お名前・電話が入った状態になる） */
+        var tc;
+        $("#bc").oninput = function () {
+          var v = this.value.trim(); clearTimeout(tc); $("#bcmsg").textContent = "";
+          if (!v) return;
+          tc = setTimeout(function () {
+            api("admin_customer_by_chart", { chartNo: v }).then(function (r) {
+              if (!$("#bc") || $("#bc").value.trim() !== v) return;   // 打ち直している途中
+              if (r.customer) { cust = r.customer; drawWho(); toast("カルテ番号 " + v + " の " + r.customer.name + " さんを呼び出しました"); }
+              else $("#bcmsg").textContent = "この番号の方はまだいません。下にお名前などを入れると、この番号で登録します。";
+            }, function () { /* 呼び出せなくても、手で入れられる */ });
+          }, 400);
+        };
         var t;
         $("#bn").oninput = function () {
           var q = this.value.trim(); clearTimeout(t);
@@ -985,6 +1021,7 @@
     $("#bgo").onclick = function () {
       if (!picked) return;
       var p = { menuId: $("#bm").value, startsAt: picked, tellPatient: !!(cust && cust.hasLine && $("#btell").checked) };
+      p.chartNo = cust ? ($("#bc2") ? $("#bc2").value.trim() : "") : ($("#bc") ? $("#bc").value.trim() : "");   // lifeplus-chart-no-v1
       if (cust) p.customerId = cust.id;
       else {
         p.name = $("#bn").value.trim(); p.nameKana = $("#bk").value.trim(); p.phone = $("#bp").value.trim();
