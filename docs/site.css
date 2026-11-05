@@ -1233,3 +1233,32 @@ section { padding: clamp(56px, 9vw, 120px) 0; }
 .flow-tabs { box-shadow: 0 10px 28px -14px rgba(35,38,43,.45); }
 @media (max-width: 1200px) { .flow-tabs { top: 76px; } }
 @media (max-width: 760px) { .flow-tabs { top: 74px; } }
+
+/* ---------- はたらく人の声（採用ページ）（lifeplus-site-voices-v1）---------- */
+.voices-sec { background: linear-gradient(180deg, #fff 0%, var(--mist) 100%); }
+.voices { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: clamp(16px, 2.4vw, 28px); }
+.voice { background: #fff; border-radius: 24px; overflow: hidden; box-shadow: 0 18px 38px -28px rgba(35,38,43,.5); border-top: 6px solid var(--c); display: flex; flex-direction: column; }
+.voice-video, .voice-photo { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; margin: 0; padding: 0; border: 0; background: #111; overflow: hidden; cursor: pointer; }
+.voice-photo { aspect-ratio: 4 / 3; background: var(--mist); cursor: default; }
+.voice-video img, .voice-photo img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .5s ease; }
+.voice-video:hover img { transform: scale(1.04); }
+.voice-play { position: absolute; left: 50%; top: 50%; width: 68px; height: 68px; margin: -34px 0 0 -34px; border-radius: 50%; background: rgba(255,255,255,.92);
+  box-shadow: 0 10px 26px -10px rgba(0,0,0,.6); }
+.voice-play::after { content: ""; position: absolute; left: 27px; top: 21px; border-style: solid; border-width: 13px 0 13px 21px; border-color: transparent transparent transparent var(--c); }
+.voice-frame { width: 100%; aspect-ratio: 16 / 9; border: 0; display: block; background: #000; }
+.voice-tx { padding: 20px 22px 24px; display: grid; gap: 10px; }
+.voice-who { display: flex; align-items: center; gap: 12px; }
+.voice-who b { display: block; font-family: var(--head); font-size: 19px; line-height: 1.3; }
+.voice-who span { display: block; font-size: 13.5px; color: var(--ci); }
+.voice-face { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; flex: none; box-shadow: 0 0 0 3px var(--cs); }
+.voice-ini { display: grid; place-items: center; background: var(--cs); color: var(--ci); font-family: var(--head); font-weight: 700; font-size: 22px; }
+.voice-head { margin: 0; font-family: var(--head); font-weight: 700; font-size: clamp(18px, 1.8vw, 21px); line-height: 1.6; color: var(--ink); }
+.voice-head::before { content: "“"; color: var(--c); font-size: 1.4em; line-height: 0; margin-right: 2px; vertical-align: -.25em; }
+.voice-body { margin: 0; font-size: 15px; line-height: 1.9; color: var(--sub); }
+@media (max-width: 560px) {
+  .voice { border-radius: 18px; }
+  .voice-tx { padding: 16px 16px 20px; }
+  .voice-play { width: 56px; height: 56px; margin: -28px 0 0 -28px; }
+  .voice-play::after { left: 22px; top: 17px; border-width: 11px 0 11px 18px; }
+}
+[data-voices-link][hidden], [data-voices-sec][hidden] { display: none !important; }

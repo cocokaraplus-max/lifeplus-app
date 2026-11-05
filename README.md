@@ -110,3 +110,12 @@ deno run -A tests/e2e_server.ts & python3 tests/e2e_test.py      # 画面 11項�
 - 表：`sql/lifeplus_extra_hours_v1.sql`（extra_hours・lp_available_slots に臨時の受付時間を入れる）。★関所より先に流す
 - 関所：`admin_extra_add`・`admin_extra_del`・`admin_closure_open_day`（権限 closures）。`admin_init` に extras、`admin_day`・`admin_month`・`admin_slots`・`month`・`days` が臨時の受付時間を見る
 - 確かめ：`tests/extra_hours_test.ts`（関所 9項目）・`tests/e2e_extra_test.py`（画面 14項目）
+
+## 2026-11-05 はたらく人の声（採用ページ）（marker: lifeplus-site-voices-v1）
+- 管理画面「HP」→「はたらく人の声」：どの事業の人か・呼び名・職種や年数・ひとこと・お話・動画（YouTube の URL。限定公開でもよい）・写真・並び順・出す／下書き
+- 採用ページの「募集中の求人」と「応募・お問い合わせ」の間に出る。上に「はたらく人の声」のボタンも出る。★「出す」にしたものが1件もなければ、欄もボタンも出ない
+- 動画は、はじめは YouTube の絵と再生ボタンだけを出し、押したときに youtube-nocookie.com で再生する（開いただけでは YouTube を読まない）
+- 写真は端末で長い辺1400に小さくしてから送る（storage の site・`voices/…`）。動画があるときは小さな丸い写真、写真も動画もないときは頭文字の丸
+- 表：`sql/lifeplus_site_voices_v1.sql`（site_voices）。★関所より先に流す（流さないうちに関所を入れ替えると、ホームページの「変えられる所」が読めなくなる）
+- 関所：`site` に voices、`admin_site` に voices、`admin_site_voice_save`・`admin_site_voice_photo`・`admin_site_voice_photo_del`・`admin_site_voice_del`（権限 site）
+- 確かめ：`tests/site_voices_test.ts`（関所 6項目）・`tests/e2e_voices_test.py`（画面 15項目）

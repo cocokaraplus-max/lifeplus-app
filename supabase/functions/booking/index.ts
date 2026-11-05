@@ -183,7 +183,9 @@ const PERM_OF: Record<string, string | null> = {
   admin_settings: "settings", admin_settings_save: "settings",
   // lifeplus-site-cms-v1: ホームページ（お知らせ・求人・時間・料金・写真）
   admin_site: "site", admin_site_news_save: "site", admin_site_news_del: "site", admin_site_job_save: "site", admin_site_job_del: "site",
-  admin_site_day_hours: "site", admin_site_menus: "site", admin_site_photo: "site", admin_site_photo_reset: "site",   // customer-delete-staff-v1: HIROさん以外は、LINEなし・これからの予約なしの人だけ（下の runAdmin で見る）
+  admin_site_day_hours: "site", admin_site_menus: "site", admin_site_photo: "site", admin_site_photo_reset: "site",
+  admin_site_voice_save: "site", admin_site_voice_del: "site", admin_site_voice_photo: "site", admin_site_voice_photo_del: "site",   // lifeplus-site-voices-v1
+    // customer-delete-staff-v1: HIROさん以外は、LINEなし・これからの予約なしの人だけ（下の runAdmin で見る）
 };
 interface Me { owner: boolean; perms: string[]; label: string; staffId: string | null; deviceId?: string | null }
 async function staffOf(sql: Sql, sub: string): Promise<Me | null> {
@@ -447,6 +449,44 @@ async function contentOf(sql: Sql): Promise<Record<string, any>> {
 function newsRow(n: Record<string, any>) {
   return { id: n.id, date: String(n.nd), title: n.title, body: n.body ?? "", business: n.business, published: n.published, until: n.ud ? String(n.ud) : "" };
 }
+// lifeplus-site-voices-v1: はたらく人の声
+function voiceRow(v: Record<string, any>) {
+  return { id: v.id, business: v.business, name: v.display_name, role: v.role ?? "", headline: v.headline ?? "", body: v.body ?? "",
+    photo: v.photo_url ?? "", videoId: v.video_id ?? "", published: v.published, sort: v.sort_order };
+}
+// YouTube の URL（watch?v= / youtu.be / shorts / embed / live）か、11文字の番号から、動画の番号を取り出す。読めなければ null
+export function youtubeId(v: unknown): string | null {
+  const s = str(v, 300);
+  if (/^[A-Za-z0-9_-]{11}$/.test(s)) return s;
+  let u: URL;
+  try { u = new URL(s); } catch { return null; }
+  const host = u.hostname.replace(/^www\.|^m\./, "");
+  let id = "";
+  if (host === "youtu.be") id = u.pathname.slice(1).split("/")[0];
+  else if (host === "youtube.com" || host === "youtube-nocookie.com" || host === "music.youtube.com") {
+    id = u.searchParams.get("v") ?? "";
+    const m = u.pathname.match(/^\/(?:shorts|embed|live|v)\/([A-Za-z0-9_-]{11})/);
+    if (!id && m) id = m[1];
+  }
+  return /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
+}
+// 送られてきた写真（data URL）を読む。JPEG・PNG・WebP だけ・3MBまで
+function readImage(body: any): { bytes: Uint8Array; ext: string; type: string } {
+  const type = str(body.type, 20);
+  const ext = type === "image/jpeg" ? "jpg" : type === "image/png" ? "png" : type === "image/webp" ? "webp" : "";
+  if (!ext) throw new ApiError("site_photo_type");
+  let bytes: Uint8Array;
+  try {
+    const bin = atob(str(body.data, 6000000).replace(/^data:[^,]*,/, ""));
+    bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  } catch { throw new ApiError("site_photo_type"); }
+  if (!bytes.length || bytes.length > PHOTO_MAX_BYTES) throw new ApiError("site_photo_size");
+  const isJpg = bytes[0] === 0xff && bytes[1] === 0xd8, isPng = bytes[0] === 0x89 && bytes[1] === 0x50,
+    isWebp = bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
+  if (!(ext === "jpg" ? isJpg : ext === "png" ? isPng : isWebp)) throw new ApiError("site_photo_type");
+  return { bytes, ext, type };
+}
 function jobRow(j: Record<string, any>) {
   return { id: j.id, business: j.business, title: j.title, employment: j.employment, summary: j.summary ?? "", duties: j.duties ?? "",
     requirements: j.requirements ?? "", salary: j.salary ?? "", hours: j.hours ?? "", holidays: j.holidays ?? "", benefits: j.benefits ?? "",
@@ -473,7 +513,9 @@ async function siteOut(sql: Sql, now: Date) {
   const news = await sql`select *, news_date::text as nd, until_date::text as ud from site_news where published and news_date <= ${today}::date
     and (until_date is null or until_date >= ${today}::date) order by news_date desc, created_at desc limit 20`;
   const jobs = await sql`select * from site_jobs where is_open order by sort_order, created_at`;
+  const voices = await sql`select * from site_voices where published order by sort_order, created_at`;   // lifeplus-site-voices-v1
   return {
+    voices: voices.map(voiceRow).map((v: any) => ({ business: v.business, name: v.name, role: v.role, headline: v.headline, body: v.body, photo: v.photo, videoId: v.videoId })),
     news: news.map(newsRow).map((n: any) => ({ date: n.date, title: n.title, body: n.body, business: n.business })),
     jobs: jobs.map(jobRow).map((j: any) => { const { open: _o, sort: _s, ...rest } = j; return rest; }),
     dayHours: c.day_hours ?? null,
@@ -495,7 +537,8 @@ async function handleSiteAdmin(body: any, deps: Deps, me: Me, now: Date): Promis
       const c = await contentOf(sql);
       const news = await sql`select *, news_date::text as nd, until_date::text as ud from site_news order by news_date desc, created_at desc limit 100`;
       const jobs = await sql`select * from site_jobs order by sort_order, created_at`;
-      return { news: news.map(newsRow), jobs: jobs.map(jobRow), dayHours: c.day_hours ?? {}, menus: await bodyMenus(sql, c),
+      const voices = await sql`select * from site_voices order by sort_order, created_at`;   // lifeplus-site-voices-v1
+      return { news: news.map(newsRow), jobs: jobs.map(jobRow), voices: voices.map(voiceRow), dayHours: c.day_hours ?? {}, menus: await bodyMenus(sql, c),
         photos: c.photos ?? {}, slots: PHOTO_SLOTS, today: jstDate(now) };
     }
     case "admin_site_news_save": {
@@ -614,6 +657,51 @@ async function handleSiteAdmin(body: any, deps: Deps, me: Me, now: Date): Promis
       const photos = { ...(c.photos ?? {}), [slot]: url };
       await putContent("photos", photos);
       return { ok: true, photos };
+    }
+    // lifeplus-site-voices-v1: はたらく人の声
+    case "admin_site_voice_save": {
+      const id = str(body.id, 40);
+      const biz = JOB_BIZ.includes(String(body.business)) ? String(body.business) : "company";
+      const name = txt(body.name, 20);
+      if (!name) throw new ApiError("site_voice_name");
+      const role = txt(body.role, 40), head = txt(body.headline, 80), b = txt(body.body, 1200);
+      const vraw = str(body.video, 300);
+      const vid = vraw ? youtubeId(vraw) : null;
+      if (vraw && !vid) throw new ApiError("site_video_invalid");
+      const pub = body.published === true;
+      const sort = Number.isInteger(Number(body.sort)) ? Math.max(0, Math.min(999, Number(body.sort))) : 0;
+      if (id) {
+        if (!UUID_RE.test(id)) throw new ApiError("bad_request");
+        const r = await sql`update site_voices set business = ${biz}, display_name = ${name}, role = ${role}, headline = ${head}, body = ${b},
+          video_id = ${vid}, published = ${pub}, sort_order = ${sort}, updated_at = ${now.toISOString()}::timestamptz where id = ${id}::uuid returning id`;
+        if (!r.length) throw new ApiError("site_not_found", 404);
+        return { ok: true, id };
+      }
+      const r = await sql`insert into site_voices (business, display_name, role, headline, body, video_id, published, sort_order)
+        values (${biz}, ${name}, ${role}, ${head}, ${b}, ${vid}, ${pub}, ${sort}) returning id`;
+      return { ok: true, id: r[0].id };
+    }
+    case "admin_site_voice_photo": {
+      const id = str(body.id, 40);
+      if (!UUID_RE.test(id)) throw new ApiError("bad_request");
+      const img = readImage(body);
+      if (!(await sql`select 1 from site_voices where id = ${id}::uuid`).length) throw new ApiError("site_not_found", 404);
+      if (!deps.putImage) throw new ApiError("server_error", 500);
+      const url = await deps.putImage(`voices/${id}-${now.getTime()}.${img.ext}`, img.bytes, img.type);
+      await sql`update site_voices set photo_url = ${url}, updated_at = ${now.toISOString()}::timestamptz where id = ${id}::uuid`;
+      return { ok: true, photo: url };
+    }
+    case "admin_site_voice_photo_del": {
+      const id = str(body.id, 40);
+      if (!UUID_RE.test(id)) throw new ApiError("bad_request");
+      await sql`update site_voices set photo_url = null, updated_at = ${now.toISOString()}::timestamptz where id = ${id}::uuid`;
+      return { ok: true };
+    }
+    case "admin_site_voice_del": {
+      const id = str(body.id, 40);
+      if (!UUID_RE.test(id)) throw new ApiError("bad_request");
+      await sql`delete from site_voices where id = ${id}::uuid`;
+      return { ok: true };
     }
     case "admin_site_photo_reset": {
       const slot = str(body.slot, 20);

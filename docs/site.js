@@ -224,6 +224,36 @@
         });
       }
     });
+    // lifeplus-site-voices-v1: はたらく人の声（採用ページ）。1件もなければ欄ごと出さない
+    each("[data-voices]", function (box) {
+      var vs = d.voices || [];
+      var sec = box.closest("[data-voices-sec]"), link = document.querySelector("[data-voices-link]");
+      if (!vs.length) { if (sec) sec.hidden = true; if (link) link.hidden = true; return; }
+      var cls = function (b) { return b === "sekkotsu" ? "kotsu" : b === "bodycare" ? "body" : b === "company" ? "app" : "day"; };
+      box.innerHTML = vs.map(function (v) {
+        var media = v.videoId
+          ? '<button type="button" class="voice-video" data-yt="' + esc(v.videoId) + '" aria-label="' + esc(v.name) + 'の動画を見る">' +
+            '<img src="https://i.ytimg.com/vi/' + esc(v.videoId) + '/hqdefault.jpg" alt="" loading="lazy"><span class="voice-play" aria-hidden="true"></span></button>'
+          : v.photo ? '<figure class="voice-photo"><img src="' + esc(v.photo) + '" alt="' + esc(v.name) + 'の写真" loading="lazy"></figure>' : "";
+        var face = v.videoId && v.photo ? '<img class="voice-face" src="' + esc(v.photo) + '" alt="" loading="lazy">'
+          : !v.videoId && !v.photo ? '<span class="voice-face voice-ini" aria-hidden="true">' + esc(v.name.slice(0, 1)) + "</span>" : "";
+        return '<article class="voice c-' + cls(v.business) + (media ? "" : " no-media") + '">' + media +
+          '<div class="voice-tx"><div class="voice-who">' + face + '<div><b>' + esc(v.name) + "</b>" +
+          '<span>' + esc([BIZ[v.business] || "", v.role].filter(Boolean).join("・")) + "</span></div></div>" +
+          (v.headline ? '<p class="voice-head">' + br(v.headline) + "</p>" : "") +
+          (v.body ? '<p class="voice-body">' + br(v.body) + "</p>" : "") + "</div></article>";
+      }).join("");
+      Array.prototype.forEach.call(box.querySelectorAll("[data-yt]"), function (b) {
+        b.onclick = function () {
+          var f = document.createElement("iframe");
+          f.src = "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(b.getAttribute("data-yt")) + "?autoplay=1&rel=0&playsinline=1";
+          f.title = b.getAttribute("aria-label"); f.allow = "autoplay; encrypted-media; picture-in-picture; fullscreen"; f.allowFullscreen = true;
+          f.className = "voice-frame"; b.replaceWith(f);
+        };
+      });
+      if (sec) sec.hidden = false;
+      if (link) link.hidden = false;
+    });
     each("[data-job-count]", function (el) {
       var n = (d.jobs || []).length;
       el.textContent = n ? "いま " + n + " 件の募集があります" : "";

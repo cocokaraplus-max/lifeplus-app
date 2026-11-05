@@ -336,3 +336,9 @@ button, a { -webkit-tap-highlight-color: rgba(29, 78, 216, .18); }
 .time.busy { background: #fff4dc; border-color: #f0c36d; color: #9a5b00; position: relative; }
 .time.busy.on { background: var(--blue); color: #fff; border-color: var(--blue); }
 .tk.ov { background: #b45309; color: #fff; }
+
+/* ---------- はたらく人の声  marker: lifeplus-site-voices-v1 ---------- */
+.voice-item { position: relative; padding-right: 96px; }
+.vi-th { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 72px; height: 54px; object-fit: cover; border-radius: 8px; background: #eef1f6; }
+.voice-pick { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.voice-pick img { width: 72px; height: 72px; object-fit: cover; border-radius: 50%; background: #eef1f6; }

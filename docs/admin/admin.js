@@ -41,6 +41,8 @@
     booking_not_pending: "この予約はもう確認済みです。",
     booking_not_found: "この予約は見つかりませんでした。",
     customer_not_found: "このお客さまは見つかりませんでした。",
+    site_voice_name: "呼び名を入れてください。",   // lifeplus-site-voices-v1
+    site_video_invalid: "動画の URL が読めませんでした。YouTube の「共有」でコピーした URL を貼ってください。",
     chart_dup: "このカルテ番号は、ほかの方に使われています。番号を確かめてください。",   // lifeplus-chart-no-v1
     closure_not_found: "この休みは見つかりませんでした。もう外されているかもしれません。",   // lifeplus-closure-notice-v1
     extra_overlap: "この日は、その時間にもう臨時の受付が入っています。",   // lifeplus-extra-hours-v1
@@ -1419,7 +1421,7 @@
   // ホームページ（お知らせ・求人・デイの時間・ボディケアの料金・写真）  marker: lifeplus-site-cms-v1
   //   site の権限がある人（HIROさん・権限を渡したスタッフ・お店の端末）だけ
   // =============================================================
-  var SITE_SECS = [["news", "お知らせ"], ["jobs", "求人"], ["day", "デイの時間"], ["menus", "ボディケアの料金"], ["photos", "写真"]];
+  var SITE_SECS = [["news", "お知らせ"], ["jobs", "求人"], ["voices", "はたらく人の声"] /* lifeplus-site-voices-v1 */, ["day", "デイの時間"], ["menus", "ボディケアの料金"], ["photos", "写真"]];
   var NEWS_BIZ = [["all", "すべてのページ"], ["day", "デイサービス"], ["sekkotsu", "接骨院"], ["bodycare", "ボディケア"]];
   var JOB_BIZ = [["day", "デイサービス"], ["sekkotsu", "接骨院"], ["bodycare", "ボディケア"], ["company", "会社全体"]];
   var PHOTO_DEFAULT = {
@@ -1454,6 +1456,16 @@
           '<span class="si-tag">' + esc(j.employment) + "</span>" + '<span class="si-st' + (j.open ? " on" : "") + '">' + (j.open ? "募集中" : "募集していない") + "</span></span>" +
           '<b class="si-title">' + esc(j.title) + "</b></button>";
       }).join("") : '<div class="empty">求人はまだありません</div>';
+    } else if (sec === "voices") {   // lifeplus-site-voices-v1
+      h += '<p class="note">いま働いている職員の声を、採用情報のページに出せます。「出す」にしたものが1件もなければ、ページにこの欄は出ません。顔や名前を出すときは、ご本人の了解をもらってください。</p>';
+      h += '<button class="btn mint wide" id="vnew" style="margin:0 0 12px">＋ 声を足す</button>';
+      h += (S.voices || []).length ? S.voices.map(function (v, i) {
+        return '<button class="card site-item voice-item" data-vi="' + i + '">' +
+          (v.videoId ? '<img class="vi-th" alt="" src="https://i.ytimg.com/vi/' + esc(v.videoId) + '/default.jpg">' : v.photo ? '<img class="vi-th" alt="" src="' + esc(v.photo) + '">' : "") +
+          '<span class="si-top"><span class="si-tag">' + esc(label(JOB_BIZ, v.business)) + "</span>" + (v.videoId ? '<span class="si-tag">動画</span>' : "") +
+          '<span class="si-st' + (v.published ? " on" : "") + '">' + (v.published ? "出している" : "下書き") + "</span></span>" +
+          '<b class="si-title">' + esc(v.name) + (v.role ? "（" + esc(v.role) + "）" : "") + "</b>" + (v.headline ? '<span class="note" style="margin:2px 0 0">' + esc(v.headline) + "</span>" : "") + "</button>";
+      }).join("") : '<div class="empty">まだありません</div>';
     } else if (sec === "day") {
       var d = S.dayHours || {};
       h += '<div class="card"><h2 style="margin-top:0">デイサービスの利用時間</h2>' +
@@ -1487,6 +1499,8 @@
     if ($("#nnew")) $("#nnew").onclick = function () { newsForm(null); };
     on("[data-ni]", function (b) { newsForm(S.news[Number(b.getAttribute("data-ni"))]); });
     if ($("#jnew")) $("#jnew").onclick = function () { jobForm(null); };
+    if ($("#vnew")) $("#vnew").onclick = function () { voiceForm(null); };   // lifeplus-site-voices-v1
+    on("[data-vi]", function (b) { voiceForm(S.voices[Number(b.getAttribute("data-vi"))]); });
     on("[data-ji]", function (b) { jobForm(S.jobs[Number(b.getAttribute("data-ji"))]); });
     if ($("#dhgo")) $("#dhgo").onclick = function () {
       busy($("#dhgo"), api("admin_site_day_hours", { dayHours: { am: $("#dha").value, pm: $("#dhp").value, sun: $("#dhs").value, days: $("#dhd").value } }))
@@ -1548,6 +1562,61 @@
     if ($("#ndel")) $("#ndel").onclick = function () {
       confirmSheet("このお知らせを消しますか？", "「" + n.title + "」を消します。元に戻せません。", "消す", function () {
         return api("admin_site_news_del", { id: n.id }).then(function () { closeSheet(); toast("消しました"); showSite(); });
+      });
+    };
+  }
+  // lifeplus-site-voices-v1: はたらく人の声（写真は端末の中で小さくしてから送る）
+  function shrinkPhoto(file, max) {
+    return new Promise(function (ok, ng) {
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        var w = img.naturalWidth, h = img.naturalHeight, r = Math.min(1, max / Math.max(w, h));
+        var cv = document.createElement("canvas"); cv.width = Math.round(w * r); cv.height = Math.round(h * r);
+        cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+        URL.revokeObjectURL(url); ok(cv.toDataURL("image/jpeg", 0.85));
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); ng(); };
+      img.src = url;
+    });
+  }
+  function voiceForm(v) {
+    var x = v || { business: "day", name: "", role: "", headline: "", body: "", videoId: "", photo: "", published: true, sort: 0 };
+    var file = null;
+    openSheet("<h3>" + (v ? "声を直す" : "声を足す") + "</h3>" +
+      '<label class="f"><span>どの事業の人か</span><select id="vb">' + opts(JOB_BIZ, x.business) + "</select></label>" +
+      '<div class="two"><label class="f"><span>呼び名（必須）</span><input id="vn" maxlength="20" value="' + esc(x.name) + '" placeholder="例：Aさん・山田さん"></label>' +
+      '<label class="f"><span>職種・年数</span><input id="vr" maxlength="40" value="' + esc(x.role) + '" placeholder="例：介護職員・3年目"></label></div>' +
+      '<label class="f"><span>ひとこと（大きく出ます）</span><input id="vh" maxlength="80" value="' + esc(x.headline) + '" placeholder="例：利用者さんの「ありがとう」が毎日の力です"></label>' +
+      '<label class="f"><span>お話（なくても大丈夫です）</span><textarea id="vx" maxlength="1200" placeholder="例：入ったきっかけ・仕事のやりがい・職場の雰囲気など">' + esc(x.body) + "</textarea></label>" +
+      '<label class="f"><span>動画（YouTube の URL。限定公開でもOK・なくても大丈夫です）</span><input id="vv" inputmode="url" maxlength="300" value="' + (x.videoId ? "https://youtu.be/" + esc(x.videoId) : "") + '" placeholder="例：https://youtu.be/xxxxxxxxxxx"></label>' +
+      '<div class="f"><span>写真（なくても大丈夫です。動画があるときは小さな丸い写真になります）</span><div class="voice-pick">' +
+        '<img id="vpimg" alt=""' + (x.photo ? ' src="' + esc(x.photo) + '"' : " hidden") + ">" +
+        '<label class="btn small line pick">写真を選ぶ<input type="file" accept="image/*" id="vpf" hidden></label>' +
+        (x.photo ? '<button class="link red" id="vpdel" type="button">写真を外す</button>' : "") + "</div></div>" +
+      '<label class="f"><span>並び順（小さい数ほど上）</span><input id="vs" type="number" min="0" max="999" value="' + esc(x.sort) + '"></label>' +
+      '<label class="check"><input type="checkbox" id="vp"' + (x.published ? " checked" : "") + ">採用情報のページに出す（外すと下書き）</label>" +
+      '<button class="btn mint wide" id="vgo">保存する</button>' +
+      (v ? '<div class="danger-zone" style="text-align:center"><button class="link red" id="vdel">この声を消す</button></div>' : "") +
+      '<button class="btn gray wide" id="vno">やめる</button>');
+    $("#vno").onclick = closeSheet;
+    $("#vpf").onchange = function () {
+      var f = this.files && this.files[0]; if (!f) return;
+      shrinkPhoto(f, 1400).then(function (data) { file = data; var im = $("#vpimg"); im.src = data; im.hidden = false; },
+        function () { toast("この写真は読み込めませんでした。JPEG か PNG の写真を選んでください。"); });
+    };
+    if ($("#vpdel")) $("#vpdel").onclick = function () {
+      busy($("#vpdel"), api("admin_site_voice_photo_del", { id: v.id })).then(function () { closeSheet(); toast("写真を外しました"); showSite(); }, fail);
+    };
+    $("#vgo").onclick = function () {
+      if (!$("#vn").value.trim()) { toast("呼び名を入れてください。"); return; }
+      var p = api("admin_site_voice_save", { id: v ? v.id : "", business: $("#vb").value, name: $("#vn").value, role: $("#vr").value, headline: $("#vh").value,
+        body: $("#vx").value, video: $("#vv").value.trim(), sort: Number($("#vs").value) || 0, published: $("#vp").checked })
+        .then(function (r) { return file ? api("admin_site_voice_photo", { id: r.id, type: "image/jpeg", data: file }) : r; });
+      busy($("#vgo"), p).then(function () { closeSheet(); toast("保存しました"); showSite(); }, fail);
+    };
+    if ($("#vdel")) $("#vdel").onclick = function () {
+      confirmSheet("この声を消しますか？", "「" + v.name + "」の声を消します。元に戻せません。ページに出さないだけなら「出す」を外してください。", "消す", function () {
+        return api("admin_site_voice_del", { id: v.id }).then(function () { closeSheet(); toast("消しました"); showSite(); });
       });
     };
   }
