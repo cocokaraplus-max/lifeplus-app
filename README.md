@@ -119,3 +119,13 @@ deno run -A tests/e2e_server.ts & python3 tests/e2e_test.py      # 画面 11項�
 - 表：`sql/lifeplus_site_voices_v1.sql`（site_voices）。★関所より先に流す（流さないうちに関所を入れ替えると、ホームページの「変えられる所」が読めなくなる）
 - 関所：`site` に voices、`admin_site` に voices、`admin_site_voice_save`・`admin_site_voice_photo`・`admin_site_voice_photo_del`・`admin_site_voice_del`（権限 site）
 - 確かめ：`tests/site_voices_test.ts`（関所 6項目）・`tests/e2e_voices_test.py`（画面 15項目）
+
+## 2026-11-07 予約のメニューを管理画面から作る・直す（marker: lifeplus-menu-edit-v1）
+- 管理画面「設定」のいちばん下に「予約のメニュー」（設定の権限＝HIROさんだけ）。事業ごとに並ぶ
+  - 足す・直す：名前・説明（名前の下に小さく出る）・施術の時間・あとの片付け（15分きざみ）・料金の所に出すもの（出さない＝保険診療／金額／言葉）・並び順・予約ページに出す／止める
+  - 消す：予約に使ったことのないメニューだけ。使ったことがあるものは「止める」にする
+  - 時間を変えても、もう入っている予約の時間はそのまま
+- 料金の所の「言葉」（menus.price_label・30字まで）：入っていれば、予約ページの料金の所に金額・「保険診療」の代わりに出す（例：来院時にご案内）
+- 表：`sql/lifeplus_menu_edit_v1.sql`（menus に price_label）。★関所より先に流す（流さないうちに関所を入れ替えると、予約ページが開かなくなる）
+- 関所：`init` の menus に priceLabel、`admin_menus`・`admin_menu_save`・`admin_menu_del`（権限 settings）
+- 確かめ：`tests/menu_edit_test.ts`（関所 6項目）・`tests/e2e_menu_test.py`（画面 10項目）

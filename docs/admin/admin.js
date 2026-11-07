@@ -53,6 +53,9 @@
     phone_invalid: "電話番号は数字10〜11桁で入れてください。",
     kana_invalid: "フリガナはカタカナ（ひらがなでも可）で入れてください。",   // lifeplus-cust-edit-v1
     menu_not_found: "このメニューは使えません。",
+    menu_name_required: "メニューの名前を入れてください。",   // lifeplus-menu-edit-v1
+    menu_time_invalid: "時間は15分きざみで選んでください。",
+    menu_in_use: "このメニューは予約に使ったことがあるので消せません。「予約ページに出す」を外して止めてください。",
     message_required: "送る文を入れてください。",
     no_line: "このお客さまはLINEでつながっていないため送れません。",
     send_failed: "LINEへの送信に失敗しました。少しおいてもう一度お試しください。",
@@ -1362,7 +1365,7 @@
   var WD_ISO = [[1, "月"], [2, "火"], [3, "水"], [4, "木"], [5, "金"], [6, "土"], [7, "日"]];
   function showSettings() {
     loadingMain("設定");
-    api("admin_settings").then(function (r) { A.set = JSON.parse(JSON.stringify(r)); renderSettings(); }, fail);
+    Promise.all([api("admin_settings"), api("admin_menus")]).then(function (rs) { A.set = JSON.parse(JSON.stringify(rs[0])); A.menus = rs[1]; renderSettings(); }, fail);   // lifeplus-menu-edit-v1
   }
   function renderSettings() {
     var S = A.set, h = "";
@@ -1390,7 +1393,9 @@
       '<label class="f"><span>ドタキャンが何回続いたら、通院中でも仮予約に戻すか</span><input type="number" id="sn" min="1" max="10" value="' + esc(S.noshowLimit) + '"></label>' +
       '<p class="note">締め切りと何日先までは、お客さまの予約ページに使われます。手で入れる予約には効きません。</p></div>';
     h += '<button class="btn mint wide" id="sgo">保存する</button><button class="btn gray wide" id="sre">元に戻す（保存しない）</button>';
-    frame('<div class="day"><h1 class="title">設定</h1></div><div class="sub">受付時間と予約の決まりごと</div>', h);
+    h += menusCard();   // lifeplus-menu-edit-v1
+    frame('<div class="day"><h1 class="title">設定</h1></div><div class="sub">受付時間・予約の決まりごと・予約のメニュー</div>', h);
+    wireMenus();
     var num = function (el) { return Number(el.value); };
     on("[data-hadd]", function (el) {
       var w = Number(el.getAttribute("data-hadd")), same = S.hours.filter(function (x) { return x.weekday === w; });
@@ -1414,6 +1419,77 @@
           A.set = JSON.parse(JSON.stringify(r));
           return api("admin_init").then(function (d) { d.me = A.init.me; A.init = d; renderSettings(); toast("保存しました"); });
         }, fail);
+    };
+  }
+
+  // lifeplus-menu-edit-v1: 予約のメニュー（お客さまが予約のときに選ぶ項目）
+  function menuPrice(m) {   // 予約ページの料金の出し方（docs/yoyaku/app.js の priceText）と同じ
+    return m.priceLabel ? m.priceLabel : m.priceYen != null ? Number(m.priceYen).toLocaleString("ja-JP") + "円"
+      : /保険外|自由診療|自費/.test(m.name) ? "施術内容により異なります" : "保険診療";
+  }
+  function menusCard() {
+    var R = A.menus || { businesses: [], menus: [] };
+    var h = '<div class="card menus-card"><h2 style="margin-top:0">予約のメニュー</h2>' +
+      '<p class="note">お客さまが予約のときに選ぶ項目です。ここで変えると、すぐ予約ページに出ます（上の「保存する」は要りません）。</p>';
+    R.businesses.forEach(function (b) {
+      var ms = R.menus.filter(function (m) { return m.businessId === b.id; });
+      h += '<h3 class="mh">' + esc(b.name) + "</h3>" + (ms.length ? ms.map(function (m) {
+        return '<button class="mi' + (m.active ? "" : " off") + '" data-mid="' + esc(m.id) + '"><span class="mi-n">' + esc(m.name) +
+          (m.active ? "" : '<em class="mi-off">止めている</em>') + "</span>" +
+          '<span class="mi-m">' + m.durationMin + "分" + (m.bufferMin ? "（あと片付け" + m.bufferMin + "分）" : "") + "・" + esc(menuPrice(m)) + "</span>" +
+          (m.description ? '<span class="mi-d">' + esc(m.description) + "</span>" : "") + "</button>";
+      }).join("") : '<p class="note">メニューがありません</p>') +
+        '<button class="link" data-madd="' + esc(b.id) + '">＋ ' + esc(b.name) + " のメニューを足す</button>";
+    });
+    return h + "</div>";
+  }
+  function wireMenus() {
+    on("[data-mid]", function (el) { menuForm(A.menus.menus.filter(function (m) { return m.id === el.getAttribute("data-mid"); })[0]); });
+    on("[data-madd]", function (el) { menuForm(null, el.getAttribute("data-madd")); });
+  }
+  function reloadMenus() { return api("admin_menus").then(function (r) { A.menus = r; return api("admin_init"); }).then(function (d) { d.me = A.init.me; A.init = d; renderSettings(); }); }
+  function minOptions(from, to, sel) { var h = ""; for (var m = from; m <= to; m += 15) h += '<option value="' + m + '"' + (m === sel ? " selected" : "") + ">" + m + "分</option>"; return h; }
+  function menuForm(m, bizId) {
+    var x = m || { businessId: bizId, name: "", description: "", durationMin: 15, bufferMin: 0, priceYen: null, priceLabel: "", active: true, sort: (A.menus.menus.filter(function (v) { return v.businessId === bizId; }).length + 1) * 1 };
+    var bname = (A.menus.businesses.filter(function (b) { return b.id === x.businessId; })[0] || {}).name || "";
+    var pmode = x.priceLabel ? "label" : x.priceYen != null ? "yen" : "none";
+    openSheet("<h3>" + (m ? "メニューを直す" : esc(bname) + " のメニューを足す") + "</h3>" +
+      (m && m.upcoming ? '<p class="note">このメニューで入っている、これからの予約：' + m.upcoming + "件。時間を変えても、入っている予約の時間はそのままです。</p>" : "") +
+      '<label class="f"><span>名前（お客さまが選ぶ項目・必須）</span><input id="mn" maxlength="30" value="' + esc(x.name) + '" placeholder="例：保険が使えるか分からない方"></label>' +
+      '<label class="f"><span>説明（名前の下に小さく出ます）</span><textarea id="md" maxlength="120" placeholder="例：来院時にお話を伺って、保険か保険外かをご説明します">' + esc(x.description) + "</textarea></label>" +
+      '<div class="two"><label class="f"><span>施術の時間</span><select id="mdu">' + minOptions(15, 240, x.durationMin) + "</select></label>" +
+      '<label class="f"><span>あとの片付け（予約を入れない時間）</span><select id="mbu">' + minOptions(0, 120, x.bufferMin) + "</select></label></div>" +
+      '<div class="f"><span>料金の所に出すもの</span><div class="chips" role="radiogroup">' +
+        [["none", "出さない（保険診療）"], ["yen", "金額"], ["label", "言葉"]].map(function (o) { return '<button type="button" class="chip' + (pmode === o[0] ? " on" : "") + '" data-pm="' + o[0] + '" role="radio" aria-checked="' + (pmode === o[0]) + '">' + o[1] + "</button>"; }).join("") + "</div></div>" +
+      '<label class="f" id="pyen"' + (pmode === "yen" ? "" : " hidden") + '><span>金額（円）</span><input id="mpy" type="number" min="0" step="100" value="' + (x.priceYen != null ? esc(x.priceYen) : "") + '"></label>' +
+      '<label class="f" id="plab"' + (pmode === "label" ? "" : " hidden") + '><span>言葉（30字まで）</span><input id="mpl" maxlength="30" value="' + esc(x.priceLabel) + '" placeholder="例：来院時にご案内"></label>' +
+      '<label class="f"><span>並び順（小さい数ほど上）</span><input id="mso" type="number" min="0" max="999" value="' + esc(x.sort) + '"></label>' +
+      '<label class="check"><input type="checkbox" id="mac"' + (x.active ? " checked" : "") + ">予約ページに出す（外すと止める）</label>" +
+      '<button class="btn mint wide" id="mgo">保存する</button>' +
+      (m ? '<div class="danger-zone" style="text-align:center"><button class="link red" id="mdel">このメニューを消す</button></div>' : "") +
+      '<button class="btn gray wide" id="mno">やめる</button>');
+    on("[data-pm]", function (el) {
+      pmode = el.getAttribute("data-pm");
+      $$("[data-pm]", $sb).forEach(function (b) { var y = b === el; b.classList.toggle("on", y); b.setAttribute("aria-checked", String(y)); });
+      $("#pyen").hidden = pmode !== "yen"; $("#plab").hidden = pmode !== "label";
+    }, $sb);
+    $("#mno").onclick = closeSheet;
+    $("#mgo").onclick = function () {
+      if (!$("#mn").value.trim()) { toast("名前を入れてください。"); return; }
+      if (pmode === "yen" && $("#mpy").value === "") { toast("金額を入れてください。"); return; }
+      if (pmode === "label" && !$("#mpl").value.trim()) { toast("料金の所に出す言葉を入れてください。"); return; }
+      busy($("#mgo"), api("admin_menu_save", { id: m ? m.id : "", businessId: x.businessId, name: $("#mn").value, description: $("#md").value,
+        durationMin: Number($("#mdu").value), bufferMin: Number($("#mbu").value),
+        priceYen: pmode === "yen" ? Number($("#mpy").value) : null, priceLabel: pmode === "label" ? $("#mpl").value : "",
+        sort: Number($("#mso").value) || 0, active: $("#mac").checked })).then(function () {
+        closeSheet(); toast("保存しました"); return reloadMenus();
+      }, fail);
+    };
+    if ($("#mdel")) $("#mdel").onclick = function () {
+      if (m.used) { toast("このメニューは予約に使ったことがあるので消せません。「予約ページに出す」を外して止めてください。"); return; }
+      confirmSheet("このメニューを消しますか？", "「" + m.name + "」を消します。元に戻せません。", "消す", function () {
+        return api("admin_menu_del", { id: m.id }).then(function () { closeSheet(); toast("消しました"); return reloadMenus(); });
+      });
     };
   }
 

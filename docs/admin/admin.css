@@ -342,3 +342,14 @@ button, a { -webkit-tap-highlight-color: rgba(29, 78, 216, .18); }
 .vi-th { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 72px; height: 54px; object-fit: cover; border-radius: 8px; background: #eef1f6; }
 .voice-pick { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .voice-pick img { width: 72px; height: 72px; object-fit: cover; border-radius: 50%; background: #eef1f6; }
+
+/* ---------- 予約のメニュー  marker: lifeplus-menu-edit-v1 ---------- */
+.menus-card { margin-top: 18px; }
+.menus-card .mh { font-size: 16px; margin: 16px 0 6px; }
+.mi { display: grid; gap: 2px; width: 100%; text-align: left; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 11px 14px; margin: 0 0 8px; font: inherit; color: inherit; cursor: pointer; }
+.mi:hover { border-color: var(--blue); }
+.mi.off { background: #f4f5f8; color: var(--mute); }
+.mi-n { font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mi-off { font-style: normal; font-size: 12px; font-weight: 700; color: #9a5b00; background: #fff4dc; border-radius: 999px; padding: 1px 8px; }
+.mi-m { font-size: 13.5px; color: var(--mute); }
+.mi-d { font-size: 13px; color: var(--mute); }

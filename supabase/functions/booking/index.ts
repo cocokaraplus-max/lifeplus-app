@@ -181,6 +181,7 @@ const PERM_OF: Record<string, string | null> = {
   admin_staff: "staff", admin_staff_invite: "staff", admin_staff_update: "staff", admin_staff_del: "staff",
   admin_devices: "staff", admin_device_code: "staff", admin_device_update: "staff", admin_device_del: "staff",
   admin_settings: "settings", admin_settings_save: "settings",
+  admin_menus: "settings", admin_menu_save: "settings", admin_menu_del: "settings",   // lifeplus-menu-edit-v1
   // lifeplus-site-cms-v1: ホームページ（お知らせ・求人・時間・料金・写真）
   admin_site: "site", admin_site_news_save: "site", admin_site_news_del: "site", admin_site_job_save: "site", admin_site_job_del: "site",
   admin_site_day_hours: "site", admin_site_menus: "site", admin_site_photo: "site", admin_site_photo_reset: "site",
@@ -809,7 +810,7 @@ export async function handle(body: any, deps: Deps): Promise<Record<string, unkn
       const businesses = await sql`
         select id, name, color from businesses where accepts_booking order by sort_order`;
       const menus = await sql`
-        select m.id, m.business_id, m.name, m.description, m.duration_min, m.price_yen
+        select m.id, m.business_id, m.name, m.description, m.duration_min, m.price_yen, m.price_label
         from menus m join businesses b on b.id = m.business_id
         where m.is_active and b.accepts_booking
         order by b.sort_order, m.sort_order`;
@@ -818,7 +819,7 @@ export async function handle(body: any, deps: Deps): Promise<Record<string, unkn
         businesses: businesses.map((b: Record<string, unknown>) => ({ id: b.id, name: b.name, color: b.color })),
         menus: menus.map((m: Record<string, unknown>) => ({
           id: m.id, businessId: m.business_id, name: m.name, description: m.description,
-          durationMin: m.duration_min, priceYen: m.price_yen,
+          durationMin: m.duration_min, priceYen: m.price_yen, priceLabel: m.price_label ?? "",   // lifeplus-menu-edit-v1
         })),
         symptoms: SYMPTOMS,
         bookings: await myBookings(sql, cust.id, now),
@@ -1494,6 +1495,60 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
 
     // 設定（HIROさんだけ）  marker: lifeplus-settings-v1
     //   受付時間（曜日ごと・種類つき）と、予約の決まりごと（締め切り・何日先まで・ドタキャンの回数）
+    // lifeplus-menu-edit-v1: 予約メニューを作る・直す・止める・消す（HIROさん・設定の権限）
+    case "admin_menus": {
+      const rows = await sql`
+        select m.*, b.name as business_name, b.sort_order as bs,
+          (select count(*)::int from bookings k where k.menu_id = m.id and k.status in ('pending','confirmed') and k.ends_at > ${now.toISOString()}::timestamptz) as upcoming,
+          (select count(*)::int from bookings k where k.menu_id = m.id) as used
+        from menus m join businesses b on b.id = m.business_id where b.accepts_booking
+        order by b.sort_order, m.sort_order, m.created_at`;
+      const biz = await sql`select id, name from businesses where accepts_booking order by sort_order`;
+      return {
+        businesses: biz.map((b: Record<string, unknown>) => ({ id: b.id, name: b.name })),
+        menus: rows.map((m: Record<string, any>) => ({ id: m.id, businessId: m.business_id, name: m.name, description: m.description ?? "",
+          durationMin: m.duration_min, bufferMin: m.buffer_after_min, priceYen: m.price_yen, priceLabel: m.price_label ?? "",
+          active: m.is_active, sort: m.sort_order, upcoming: m.upcoming, used: m.used })),
+      };
+    }
+    case "admin_menu_save": {
+      const id = str(body.id, 40), bizId = str(body.businessId, 20);
+      const name = txt(body.name, 30), desc = txt(body.description, 120), plabel = txt(body.priceLabel, 30);
+      const dur = Number(body.durationMin), buf = Number(body.bufferMin ?? 0), sort = Number(body.sort ?? 0);
+      const price = body.priceYen === null || body.priceYen === "" || body.priceYen === undefined ? null : Number(body.priceYen);
+      if (!name) throw new ApiError("menu_name_required");
+      if (!Number.isInteger(dur) || dur < 15 || dur > 240 || dur % 15) throw new ApiError("menu_time_invalid");
+      if (!Number.isInteger(buf) || buf < 0 || buf > 120 || buf % 15) throw new ApiError("menu_time_invalid");
+      if (price !== null && (!Number.isInteger(price) || price < 0 || price > 1000000)) throw new ApiError("site_price_invalid");
+      const st = Number.isInteger(sort) ? Math.max(0, Math.min(999, sort)) : 0;
+      const active = body.active !== false;
+      try {
+        if (id) {
+          if (!UUID_RE.test(id)) throw new ApiError("bad_request");
+          const r = await sql`update menus set name = ${name}, description = ${desc}, duration_min = ${dur}, buffer_after_min = ${buf},
+            price_yen = ${price}, price_label = ${plabel}, is_active = ${active}, sort_order = ${st} where id = ${id}::uuid returning id`;
+          if (!r.length) throw new ApiError("menu_not_found", 404);
+          return { ok: true, id };
+        }
+        const b = await sql`select 1 from businesses where id = ${bizId} and accepts_booking`;
+        if (!b.length) throw new ApiError("bad_request");
+        const r = await sql`insert into menus (business_id, name, description, duration_min, buffer_after_min, price_yen, price_label, is_active, sort_order)
+          values (${bizId}, ${name}, ${desc}, ${dur}, ${buf}, ${price}, ${plabel}, ${active}, ${st}) returning id`;
+        return { ok: true, id: r[0].id };
+      } catch (e) {
+        if (e instanceof ApiError) throw e;
+        if (String((e as Error).message).includes("unique")) throw new ApiError("site_menu_dup", 409);
+        throw e;
+      }
+    }
+    case "admin_menu_del": {
+      const id = str(body.id, 40);
+      if (!UUID_RE.test(id)) throw new ApiError("bad_request");
+      const used = await sql`select count(*)::int as n from bookings where menu_id = ${id}::uuid`;
+      if (used[0].n > 0) throw new ApiError("menu_in_use", 409);   // 予約に使ったことのあるメニューは消さない（「止める」にする）
+      await sql`delete from menus where id = ${id}::uuid`;
+      return { ok: true };
+    }
     case "admin_settings": {
       return await settingsOut(sql);
     }

@@ -51,7 +51,8 @@
   }
   function yen(n) { return n == null ? "保険診療" : n.toLocaleString("ja-JP") + "円"; }
   /* lifeplus-jiyu-menu-v1: 料金の出し方。料金が無いメニューのうち、保険外（自由診療）は「施術内容により異なります」 */
-  function priceText(n, name) {
+  function priceText(n, name, label) {
+    if (label) return label;   // lifeplus-menu-edit-v1: 管理画面で決めた「料金の所の言葉」
     if (n != null) return Number(n).toLocaleString("ja-JP") + "円";
     return /保険外|自由診療|自費/.test(String(name || "")) ? "施術内容により異なります" : "保険診療";
   }
@@ -219,7 +220,7 @@
     ms.forEach(function (m) {
       h += '<button class="choice" data-menu="' + esc(m.id) + '"><span class="body"><span class="name">' + esc(m.name) + "</span><br>" +
         '<span class="meta">' + m.durationMin + "分" + (m.description ? "　" + esc(m.description) : "") + "</span></span>" +
-        '<span class="price">' + priceText(m.priceYen, m.name) + "</span></button>";
+        '<span class="price">' + priceText(m.priceYen, m.name, m.priceLabel) + "</span></button>";
     });
     view(h);
     document.getElementById("back").onclick = function () { chooseBusiness(); };
@@ -350,7 +351,7 @@
       "<dt>ご予約先</dt><dd>" + esc(S.business.name) + "</dd>" +
       "<dt>メニュー</dt><dd>" + esc(S.menu.name) + "（" + S.menu.durationMin + "分）</dd>" +
       "<dt>日時</dt><dd>" + md(S.slot.date) + "（" + esc(S.slot.weekday) + "）" + esc(S.slot.time) + "〜</dd>" +
-      "<dt>料金</dt><dd>" + priceText(S.menu.priceYen, S.menu.name) + "</dd>" +
+      "<dt>料金</dt><dd>" + priceText(S.menu.priceYen, S.menu.name, S.menu.priceLabel) + "</dd>" +
       (S.symptoms.length ? "<dt>気になる所</dt><dd>" + esc(S.symptoms.join("・")) + "</dd>" : "") +
       '<dt>お名前</dt><dd class="namerow"><span>' + esc(p.name) + ' 様</span><button class="link" id="chg">変更する</button></dd>' +
       "</dl></div>" +
