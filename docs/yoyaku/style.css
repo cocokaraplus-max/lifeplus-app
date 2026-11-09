@@ -194,12 +194,28 @@ button.cal-d.on i { color: #fff; }
 /* ---------- 休みの日に「年末年始」「臨時休業」などを出す  marker: lifeplus-off-label-v1 ---------- */
 .cal-d i.lbl { font-size: 10px; line-height: 1.15; font-weight: 700; color: #9a5b00; word-break: break-all; max-width: 100%; padding: 0 2px; }
 
-/* ---------- 何日も続く休みを線で示す  marker: lifeplus-off-band-v1 ---------- */
-.cal-d.inband { position: relative; overflow: visible; }
+/* ---------- 何日も続く休みを線で示す  marker: lifeplus-off-band-v1（見た目は下の lifeplus-off-band-v2 に置きかえ） ---------- */
+
+/* ---------- 休みの帯を、休みらしく（marker: lifeplus-off-band-v2） ----------
+   ・カレンダーの祝日のような、やわらかい赤のななめ縞の帯を、休みの日の後ろに通す
+   ・帯は段（日〜土・月の終わり）ごとに1本。段の頭のマスから段の幅いっぱいに引くので、つなぎ目が出ない
+   ・期間の始まりと終わりは丸く、前の段・次の段へ続くところは角のまま。休みの名前は「☾ 年末年始」の札で1回だけ */
+.cal-d.inband { position: relative; overflow: visible; background: transparent !important; border-color: transparent !important; box-shadow: none !important; color: #be185d; }
+.cal-d.inband::after { display: none; }
+.cal-d.inband > * { position: relative; z-index: 1; }
 .cal-d.inband > i { visibility: hidden; }
-.cal-d .band { position: absolute; left: -4px; right: -4px; bottom: 5px; height: 5px; background: #f59e0b; opacity: .85; pointer-events: none; z-index: 1; }
-.cal-d .band.bs { left: 6px; border-radius: 3px 0 0 3px; }
-.cal-d .band.be { right: 6px; border-radius: 0 3px 3px 0; }
-.cal-d .band.bs.be { border-radius: 3px; }
-.cal-d .band-l { position: absolute; left: 4px; bottom: 11px; width: calc(var(--seg) * 100% + (var(--seg) - 1) * 4px - 8px); z-index: 2; pointer-events: none;
-  font-style: normal; font-size: 11px; line-height: 1.2; font-weight: 700; color: #9a5b00; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-d .band { --l: 0px; --r: 0px; position: absolute !important; z-index: 0 !important; top: 1px; bottom: 1px; height: auto; opacity: 1; pointer-events: none;
+  left: calc(-2px + var(--l)); right: auto;
+  width: calc(var(--seg) * (100% + 4px) + (var(--seg) - 1) * 4px - var(--l) - var(--r));
+  background: repeating-linear-gradient(135deg, rgba(225, 29, 72, .13) 0 5px, rgba(225, 29, 72, .04) 5px 10px);
+  border: 1px solid rgba(225, 29, 72, .22); border-left-color: transparent; border-right-color: transparent; border-radius: 0; }
+.cal-d .band.bs { --l: 2px; border-left-color: rgba(225, 29, 72, .22); border-top-left-radius: 14px; border-bottom-left-radius: 14px; }
+.cal-d .band.be { --r: 2px; border-right-color: rgba(225, 29, 72, .22); border-top-right-radius: 14px; border-bottom-right-radius: 14px; }
+.cal-d .band-l { position: absolute !important; z-index: 2 !important; left: -2px; bottom: 5px; right: auto;
+  width: calc(var(--seg) * (100% + 4px) + (var(--seg) - 1) * 4px);
+  display: flex; justify-content: center; pointer-events: none; font-style: normal; color: inherit; overflow: visible; }
+.cal-d .band-l > span { max-width: calc(100% - 8px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 11px; line-height: 1; font-weight: 800; letter-spacing: .02em; color: #be185d;
+  background: #fff; border: 1px solid rgba(225, 29, 72, .28); border-radius: 999px; padding: 3px 7px 3px 5px;
+  box-shadow: 0 1px 2px rgba(190, 24, 93, .12); }
+.cal-d .band-l > span::before { content: "☾"; margin-right: 2px; font-weight: 400; }

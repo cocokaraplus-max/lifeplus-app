@@ -28,6 +28,7 @@ def check(name, cond):
 subprocess.run(DB + ["delete from bookings; delete from closures; delete from extra_hours; update app_settings set value='Uhiro' where key='admin_line_user_ids';"], check=True)
 api("hiro", "admin_closure_add", date="2026-10-26", endDate="2026-10-29", notice="年末年始のお休み", note="家族旅行")
 api("hiro", "admin_closure_add", date="2026-10-22", notice="臨時休業")
+api("hiro", "admin_closure_add", date="2026-11-06", endDate="2026-11-10", notice="秋季休業")   # 週をまたぐ（金〜火）
 api("hiro", "admin_closure_add", date="2026-10-31", note="研修")
 api("hiro", "admin_closure_add", date="2026-10-24", notice="<b>点検</b>")   # 記号が入っても崩れない
 api("pat", "profile", name="テスト 一郎", nameKana="てすと いちろう", phone="09011112222")
@@ -54,9 +55,16 @@ with sync_playwright() as p:
     check("お客さま：年末年始の休みの日に「年末年始」", cell(26).inner_text().replace("\n", "") == "26年末年始")
     check("お客さま：臨時休業の日に「臨時休業」", cell(22).inner_text().replace("\n", "") == "22臨時休業")
     check("お客さま：メモだけの休みは「休」のまま（メモは出ない）", cell(31).inner_text().replace("\n", "") == "31休" and "研修" not in cp.content() and "家族旅行" not in cp.content())
-    check("お客さま：26〜29日は線でつながり、名前は1回だけ", cp.locator(".cal-grid .band").count() == 4 and cp.locator(".cal-grid .band-l").count() == 1
+    check("お客さま：26〜29日は線でつながり、名前は1回だけ", cp.locator(".cal-grid .band").count() == 1 and cp.locator(".cal-grid .band-l").count() == 1
           and cp.locator(".cal-grid .band.bs").count() == 1 and cp.locator(".cal-grid .band.be").count() == 1)
     cp.locator(".cal-card").screenshot(path=f"{SHOTS}/o01_customer.png")
+    # lifeplus-off-band-v2: 週をまたぐ休み（11/6 金〜11/10 火）。帯は2段、名前は最初の段に1回だけ
+    cp.locator("#nm").click(); expect(cp.locator(".cal-title")).to_have_text("2026年11月")
+    check("お客さま：週をまたぐ休みは2段の帯、名前は1回だけ", cp.locator(".cal-grid .band").count() == 2 and cp.locator(".cal-grid .band-l").count() == 1
+          and cp.locator(".cal-grid .band.bs").count() == 1 and cp.locator(".cal-grid .band.be").count() == 1
+          and cp.locator('[data-date="2026-11-08"] .band-l, .cal-grid > *:nth-child(15) .band-l').count() == 1
+          and cp.locator(".cal-grid .band-l").inner_text() == "☾秋季休業" or cp.locator(".cal-grid .band-l").inner_text() == "秋季休業")
+    cp.locator(".cal-card").screenshot(path=f"{SHOTS}/o05_customer_nov.png")
     # 2. 管理画面の休みのカレンダー
     pg = new_ctx("hiro").new_page(); pg.on("pageerror", lambda e: errors.append(str(e)))
     pg.goto(BASE + "/admin/")
@@ -66,15 +74,18 @@ with sync_playwright() as p:
     check("休みのカレンダー：「年末年始」「臨時休業」「研修」（4文字は2行）", T('[data-off="2026-10-26"]') == "26年末年始"
           and T('[data-off="2026-10-22"]') == "22臨時休業" and T('[data-off="2026-10-31"]') == "31研修"
           and pg.locator('[data-off="2026-10-26"] i br').count() == 1)
-    check("休みのカレンダー：期間は線1本、名前は1回だけ", pg.locator(".card").first.locator(".band").count() == 4 and pg.locator(".card").first.locator(".band-l").count() == 1)
+    check("休みのカレンダー：期間は線1本、名前は1回だけ", pg.locator(".card").first.locator(".band").count() == 1 and pg.locator(".card").first.locator(".band-l").count() == 1)
     pg.locator(".card").first.screenshot(path=f"{SHOTS}/o02_offcal.png")
+    pg.locator("#nm").click(); expect(pg.locator(".cal-title")).to_have_text("2026年11月")
+    check("休みのカレンダー：週をまたぐ休みも名前は1回だけ", pg.locator(".card").first.locator(".band").count() == 2 and pg.locator('[data-off="2026-11-08"] .band-l, [data-none="2026-11-08"] .band-l').count() == 1)
+    pg.locator(".card").first.screenshot(path=f"{SHOTS}/o06_offcal_nov.png")
     # 3. 予約表：その日を開くと上に大きく
     pg.locator('[data-tab="day"]').click()
     pg.locator("#dm").click()
     expect(pg.locator('[data-md="2026-10-26"]')).to_be_visible()
     check("予約表の月のカレンダー：「年末年始」「研修」", T('[data-md="2026-10-26"]') == "26年末年始" and T('[data-md="2026-10-31"]') == "31研修")
     check("記号の入った言葉も、そのまま文字で出る（画面が崩れない）", "<b>" in T('[data-md="2026-10-24"]') and pg.locator('[data-md="2026-10-24"] i b').count() == 0)
-    check("予約表の月のカレンダー：期間は線1本、名前は1回だけ", pg.locator(".sheet .band").count() == 4 and pg.locator(".sheet .band-l").count() == 1)
+    check("予約表の月のカレンダー：期間は線1本、名前は1回だけ", pg.locator(".sheet .band").count() == 1 and pg.locator(".sheet .band-l").count() == 1)
     pg.locator(".sheet").screenshot(path=f"{SHOTS}/o03_month.png")
     pg.locator('[data-md="2026-10-26"]').click()
     expect(pg.locator(".off-banner")).to_be_visible()

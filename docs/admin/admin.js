@@ -725,19 +725,32 @@
     return esc(t.slice(0, h)) + "<br>" + esc(t.slice(h));
   }
   // lifeplus-off-band-v1: 何日も続く休みは、月のカレンダーで線を引き、名前は線の頭に1回だけ出す
-  //   線は週（日〜土）や月の終わりで折り返す。折り返した次の段の頭にも名前を出す
+  //   線は週（日〜土）や月の終わりで折り返す。名前はいちばん長い段に1回だけ（lifeplus-off-band-v2）
   function bandOf(ymd, rg, lastDay) {
+    // lifeplus-off-band-v2: 帯は段（日〜土・月の終わりで区切る）ごとに1本。段の頭のマスが段の幅いっぱいに引く
+    //   名前は、この月でいちばん長い段に1回だけ（同じ長さなら前の段）
     if (!rg || ymd < rg.from || ymd > rg.to) return null;
-    var w = new Date(ymd + "T00:00:00Z").getUTCDay(), day = Number(ymd.slice(8));
-    var start = ymd === rg.from || w === 0 || day === 1;
-    var toRow = 6 - w, toRange = Math.round((Date.parse(rg.to + "T00:00:00Z") - Date.parse(ymd + "T00:00:00Z")) / 86400000), toMonth = lastDay - day;
-    var left = Math.min(toRow, toRange, toMonth);
-    return { start: start, end: left === 0, seg: left + 1 };
+    var ym = ymd.slice(0, 7), mFrom = rg.from.slice(0, 7) < ym ? ym + "-01" : rg.from;
+    var mTo = rg.to.slice(0, 7) > ym ? ym + "-" + String(lastDay).padStart(2, "0") : rg.to;
+    var D = function (s) { return Date.parse(s + "T00:00:00Z"); }, best = null, cur = null;
+    for (var t = D(mFrom); t <= D(mTo); t += 86400000) {
+      var dt = new Date(t), w = dt.getUTCDay(), s = dt.toISOString().slice(0, 10);
+      if (!cur || w === 0) { cur = { from: s, n: 0 }; }
+      cur.n += 1;
+      if (!best || cur.n > best.n) best = cur;
+    }
+    var w0 = new Date(D(ymd)).getUTCDay();
+    var start = ymd === mFrom || w0 === 0;
+    var left = Math.min(6 - w0, Math.round((D(mTo) - D(ymd)) / 86400000));
+    return { start: start, seg: left + 1, head: ymd === rg.from, tail: D(ymd) + left * 86400000 === D(rg.to),
+             label: !!best && best.from === ymd };
   }
   function bandHtml(b, label) {
-    if (!b) return "";
-    return (b.start ? '<em class="band-l" style="--seg:' + b.seg + '">' + esc(label || "休み") + "</em>" : "") + '<span class="band' + (b.start ? " bs" : "") + (b.end ? " be" : "") + '" aria-hidden="true"></span>';
+    if (!b || !b.start) return "";
+    return '<span class="band' + (b.head ? " bs" : "") + (b.tail ? " be" : "") + '" style="--seg:' + b.seg + '" aria-hidden="true"></span>' +
+      (b.label ? '<em class="band-l" style="--seg:' + b.seg + '"><span>' + esc(label || "休み") + "</span></em>" : "");
   }
+
   function closuresOn(ymd) {
     return A.closures.filter(function (c) { return c.date <= ymd && ymd <= c.endDate; });
   }
