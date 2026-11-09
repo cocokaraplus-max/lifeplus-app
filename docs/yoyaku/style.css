@@ -190,3 +190,16 @@ button.cal-d.on i { color: #fff; }
 .cal-notice li { font-size: 15px; line-height: 1.6; padding: 4px 0; font-weight: 700; color: var(--ink); }
 .cal-notice li + li { border-top: 1px dashed #f1d9a8; }
 .cal-notice-d { display: block; font-size: 13px; font-weight: 400; color: var(--mute); }
+
+/* ---------- 休みの日に「年末年始」「臨時休業」などを出す  marker: lifeplus-off-label-v1 ---------- */
+.cal-d i.lbl { font-size: 10px; line-height: 1.15; font-weight: 700; color: #9a5b00; word-break: break-all; max-width: 100%; padding: 0 2px; }
+
+/* ---------- 何日も続く休みを線で示す  marker: lifeplus-off-band-v1 ---------- */
+.cal-d.inband { position: relative; overflow: visible; }
+.cal-d.inband > i { visibility: hidden; }
+.cal-d .band { position: absolute; left: -4px; right: -4px; bottom: 5px; height: 5px; background: #f59e0b; opacity: .85; pointer-events: none; z-index: 1; }
+.cal-d .band.bs { left: 6px; border-radius: 3px 0 0 3px; }
+.cal-d .band.be { right: 6px; border-radius: 0 3px 3px 0; }
+.cal-d .band.bs.be { border-radius: 3px; }
+.cal-d .band-l { position: absolute; left: 4px; bottom: 11px; width: calc(var(--seg) * 100% + (var(--seg) - 1) * 4px - 8px); z-index: 2; pointer-events: none;
+  font-style: normal; font-size: 11px; line-height: 1.2; font-weight: 700; color: #9a5b00; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

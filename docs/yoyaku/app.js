@@ -247,6 +247,20 @@
     loadMonth(S.from);
   }
 
+  // lifeplus-off-band-v1: 何日も続く休みは、月のカレンダーで線を引き、名前は線の頭に1回だけ出す
+  //   線は週（日〜土）や月の終わりで折り返す。折り返した次の段の頭にも名前を出す
+  function bandOf(ymd, rg, lastDay) {
+    if (!rg || ymd < rg.from || ymd > rg.to) return null;
+    var w = new Date(ymd + "T00:00:00Z").getUTCDay(), day = Number(ymd.slice(8));
+    var start = ymd === rg.from || w === 0 || day === 1;
+    var toRow = 6 - w, toRange = Math.round((Date.parse(rg.to + "T00:00:00Z") - Date.parse(ymd + "T00:00:00Z")) / 86400000), toMonth = lastDay - day;
+    var left = Math.min(toRow, toRange, toMonth);
+    return { start: start, end: left === 0, seg: left + 1 };
+  }
+  function bandHtml(b, label) {
+    if (!b) return "";
+    return (b.start ? '<em class="band-l" style="--seg:' + b.seg + '">' + esc(label || "休み") + "</em>" : "") + '<span class="band' + (b.start ? " bs" : "") + (b.end ? " be" : "") + '" aria-hidden="true"></span>';
+  }
   function loadMonth(month) {
     var $cal = document.getElementById("cal");
     if (!$cal) return;
@@ -266,12 +280,14 @@
       });
       for (var k = 0; k < r.lead; k++) h += "<span></span>";
       var anyOpen = false;
+      var lastDay = r.days.length;   // lifeplus-off-band-v1
       r.days.forEach(function (d) {
+        var bd = d.state !== "out" || d.range ? bandOf(d.date, d.range, lastDay) : null;
         var can = d.state === "open" || d.state === "few";
         if (can) anyOpen = true;
         h += (can ? '<button class="cal-d ' + d.state + (S.day === d.date ? " on" : "") + '" data-day="' + esc(d.date) + '">'
-                  : '<span class="cal-d ' + d.state + '">') +
-          '<b>' + d.day + "</b><i>" + MARK[d.state] + "</i>" + (can ? "</button>" : "</span>");
+                  : '<span class="cal-d ' + d.state + (bd ? " inband" : "") + '">') +
+          '<b>' + d.day + "</b>" + (d.state === "off" && d.label ? '<i class="lbl">' + esc(d.label) + "</i>" : "<i>" + MARK[d.state] + "</i>") + (can ? "" : bandHtml(bd, d.label)) + (can ? "</button>" : "</span>");   // lifeplus-off-label-v1 / lifeplus-off-band-v1
       });
       h += "</div>";
       if (!anyOpen) h += '<p class="empty">この月はご予約いただける日がありません。</p>';

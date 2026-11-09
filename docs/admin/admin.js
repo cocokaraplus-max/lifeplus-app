@@ -292,6 +292,9 @@
         "　予約 " + live.length + "件" : "受付のない曜日です") + "</div>";
 
     var h = "";
+    // lifeplus-off-label-v1: 1日まるごとの休みの日は、上に大きく「終日お休み　年末年始のお休み」と出す
+    var allOff = d.closures.filter(function (c) { return c.from === "00:00" && c.to === "24:00"; })[0];
+    if (allOff) h += '<div class="off-banner"><b>終日お休み</b>' + (offText(allOff) ? "<span>" + esc(allOff.notice || allOff.note) + (allOff.notice && allOff.note ? "（" + esc(allOff.note) + "）" : "") + "</span>" : "") + "</div>";
     if (d.pendingCount) {
       h += '<button class="wait" id="gowait"><span class="n">' + d.pendingCount + '</span><span class="t">確認待ちの予約があります<br>（初めての方・仮予約）</span><span class="go">見る</span></button>';
     }
@@ -347,7 +350,7 @@
       if (e <= s) return;
       var tag = can("closures") ? "button" : "div";
       h += "<" + tag + ' class="xblk" data-x="' + esc(c.id) + '" style="display:flex;align-items:center;top:' + (y(s) + 3) + "px;height:" + (y(e) - y(s) - 6) + 'px">× ' +
-        esc(c.from === "00:00" && c.to === "24:00" ? "終日お休み" : c.from + "〜" + c.to) + (c.note ? "　" + esc(c.note) : "") + "</" + tag + ">";
+        esc(c.from === "00:00" && c.to === "24:00" ? "終日お休み" : c.from + "〜" + c.to) + (c.notice ? "　" + esc(c.notice) : "") + (c.note ? "　" + esc(c.note) : "") + "</" + tag + ">";   // lifeplus-off-label-v1
     });
     /* lifeplus-overlap-v1: 時間が重なった予約は横に並べる（lane＝何列目、lanes＝その重なりの列の数） */
     var lane = {}, lanes = {};
@@ -408,9 +411,11 @@
       for (var i = 0; i < r.lead; i++) h += "<span></span>";
       r.days.forEach(function (d) {
         var cls = d.off === "all" ? "closed" : !d.open && !d.staff && !d.count ? "none" : !d.open && !d.count ? "staffday" : d.off === "part" ? "part" : "open";   // lifeplus-hours-kind-v1
-        var mark = d.off === "all" ? "休" : d.count ? d.count + "件" : "";
-        h += '<button class="cal-d ' + cls + (d.date === A.init.today ? " today" : "") + (d.date === A.date ? " sel" : "") + '" data-md="' + d.date + '" aria-label="' + dayText(d.date) + (mark ? " " + mark : "") + '">' +
-          Number(d.date.slice(8)) + "<i>" + mark + "</i>" + (d.pending ? '<b class="dot" aria-hidden="true"></b>' : "") + "</button>";
+        var mark = d.off === "all" ? (d.offLabel || "休") : d.count ? d.count + "件" : "";   // lifeplus-off-label-v1
+        if (d.off === "all" && d.offLabel) cls += " lbl";
+        var bd = d.off === "all" ? bandOf(d.date, d.offRange, r.days.length) : null;   // lifeplus-off-band-v1
+        h += '<button class="cal-d ' + cls + (bd ? " inband" : "") + (d.date === A.init.today ? " today" : "") + (d.date === A.date ? " sel" : "") + '" data-md="' + d.date + '" aria-label="' + dayText(d.date) + (mark ? " " + esc(mark) : "") + '">' +
+          Number(d.date.slice(8)) + "<i>" + markHtml(mark) + "</i>" + bandHtml(bd, d.offLabel) + (d.pending ? '<b class="dot" aria-hidden="true"></b>' : "") + "</button>";
       });
       h += '</div><div class="legend" style="margin-top:8px"><span>数字＝予約の件数</span><span><b class="dot" style="position:static;display:inline-block"></b>確認待ちあり</span><span><i class="sw x"></i>休み</span></div>' +
         '<button class="btn gray wide" id="mt">今日を開く</button>';
@@ -705,6 +710,34 @@
     loadingMain("休みの設定");
     api("admin_closures").then(function (r) { A.closures = r.closures; if (A.tab === "off") renderOff(); }, fail);
   }
+  // lifeplus-off-label-v1: カレンダーのマスに出す短い言葉（関所の offShort と同じ）
+  function offShort(t) {
+    var s = String(t || "").normalize("NFKC").replace(/\s+/g, "");
+    if (!s) return "";
+    var cut = s.replace(/(のため(の)?(お)?休み|のため休業|の(お)?休み|(お)?休み)$/, "");
+    return (cut || s).slice(0, 6);
+  }
+  function offText(c) { return c.notice || c.note || ""; }
+  function markHtml(t) {   // マスの中の言葉。4文字以上は半分ずつ2行に（「年末 / 年始」）
+    t = String(t || "");
+    if (t.length < 4) return esc(t);
+    var h = Math.ceil(t.length / 2);
+    return esc(t.slice(0, h)) + "<br>" + esc(t.slice(h));
+  }
+  // lifeplus-off-band-v1: 何日も続く休みは、月のカレンダーで線を引き、名前は線の頭に1回だけ出す
+  //   線は週（日〜土）や月の終わりで折り返す。折り返した次の段の頭にも名前を出す
+  function bandOf(ymd, rg, lastDay) {
+    if (!rg || ymd < rg.from || ymd > rg.to) return null;
+    var w = new Date(ymd + "T00:00:00Z").getUTCDay(), day = Number(ymd.slice(8));
+    var start = ymd === rg.from || w === 0 || day === 1;
+    var toRow = 6 - w, toRange = Math.round((Date.parse(rg.to + "T00:00:00Z") - Date.parse(ymd + "T00:00:00Z")) / 86400000), toMonth = lastDay - day;
+    var left = Math.min(toRow, toRange, toMonth);
+    return { start: start, end: left === 0, seg: left + 1 };
+  }
+  function bandHtml(b, label) {
+    if (!b) return "";
+    return (b.start ? '<em class="band-l" style="--seg:' + b.seg + '">' + esc(label || "休み") + "</em>" : "") + '<span class="band' + (b.start ? " bs" : "") + (b.end ? " be" : "") + '" aria-hidden="true"></span>';
+  }
   function closuresOn(ymd) {
     return A.closures.filter(function (c) { return c.date <= ymd && ymd <= c.endDate; });
   }
@@ -733,13 +766,18 @@
       var whole = cs.some(function (c) { return wholeDay(c, ymd); });
       var cls = !hasH ? "none" : whole ? "closed" : cs.length ? "part" : "open";
       var ex = extrasOn(ymd).length > 0;   // lifeplus-extra-hours-v1
-      var mark = !hasH ? (whole ? "休" : ex ? "臨時" : "") : whole ? "休" : cs.length ? "一部" : ex ? "臨時" : "";
+      var wl = whole ? offShort(offText(cs.filter(function (c) { return wholeDay(c, ymd) && offText(c); })[0] || {})) : "";   // lifeplus-off-label-v1
+      var wc = whole ? cs.filter(function (c) { return wholeDay(c, ymd); })[0] : null;   // lifeplus-off-band-v1
+      var rg = wc ? { from: wc.from === "00:00" ? wc.date : addDays(wc.date, 1), to: wc.to === "24:00" ? wc.endDate : addDays(wc.endDate, -1) } : null;
+      var bd = rg && rg.from < rg.to ? bandOf(ymd, rg, days) : null;
+      var mark = !hasH ? (whole ? (wl || "休") : ex ? "臨時" : "") : whole ? (wl || "休") : cs.length ? "一部" : ex ? "臨時" : "";
+      if (wl) cls += " lbl";
       if (ex && !whole) cls += " extra";
       var noticed = cs.some(function (c) { return c.notice; }) || extrasOn(ymd).some(function (x) { return x.notice; });
-      if (pk && !past) h += '<button class="cal-d ' + cls + (pk.start === ymd ? " sel" : "") + (noticed ? " ntc" : "") + '" data-pick="' + ymd + '" aria-label="' + dayText(ymd) + (mark ? " " + mark : "") + '">' + dd + "<i>" + mark + "</i></button>";
+      if (pk && !past) h += '<button class="cal-d ' + cls + (bd ? " inband" : "") + (pk.start === ymd ? " sel" : "") + (noticed ? " ntc" : "") + '" data-pick="' + ymd + '" aria-label="' + dayText(ymd) + (mark ? " " + esc(mark) : "") + '">' + dd + "<i>" + markHtml(mark) + "</i>" + bandHtml(bd, offShort(offText(wc || {}))) + "</button>";
       else if (past) h += '<span class="cal-d none">' + dd + "</span>";
-      else if (!hasH) h += '<button class="cal-d ' + cls + (ymd === A.init.today ? " today" : "") + (noticed ? " ntc" : "") + '" data-none="' + ymd + '" aria-label="' + dayText(ymd) + " 受付のない日" + (mark ? " " + mark : "") + '">' + dd + "<i>" + mark + "</i></button>";   // lifeplus-extra-hours-v1: 受付のない日も押せる
-      else h += '<button class="cal-d ' + cls + (ymd === A.init.today ? " today" : "") + (noticed ? " ntc" : "") + '" data-off="' + ymd + '" aria-label="' + dayText(ymd) + (mark ? " " + mark : "") + '">' + dd + "<i>" + mark + "</i></button>";
+      else if (!hasH) h += '<button class="cal-d ' + cls + (bd ? " inband" : "") + (ymd === A.init.today ? " today" : "") + (noticed ? " ntc" : "") + '" data-none="' + ymd + '" aria-label="' + dayText(ymd) + " 受付のない日" + (mark ? " " + esc(mark) : "") + '">' + dd + "<i>" + markHtml(mark) + "</i>" + bandHtml(bd, offShort(offText(wc || {}))) + "</button>";   // lifeplus-extra-hours-v1: 受付のない日も押せる
+      else h += '<button class="cal-d ' + cls + (bd ? " inband" : "") + (ymd === A.init.today ? " today" : "") + (noticed ? " ntc" : "") + '" data-off="' + ymd + '" aria-label="' + dayText(ymd) + (mark ? " " + esc(mark) : "") + '">' + dd + "<i>" + markHtml(mark) + "</i>" + bandHtml(bd, offShort(offText(wc || {}))) + "</button>";
     }
     h += '</div><div class="legend" style="margin-top:8px"><span><i class="sw" style="background:var(--blue-soft)"></i>受付日</span><span><i class="sw x"></i>休み</span><span><i class="sw" style="background:var(--amber-soft)"></i>一部休み</span><span><i class="sw ex"></i>臨時の受付</span><span><b class="ntc-dot"></b>お知らせあり</span></div>' +
       '<p class="note">受付日を押すと、その日を休みにできます。時間だけ休むこともできます。受付のない日を押すと、臨時で受付にできます。何日も続けて休むときは「期間で休みを入れる」から。</p></div>';

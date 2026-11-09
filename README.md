@@ -140,3 +140,17 @@ deno run -A tests/e2e_server.ts & python3 tests/e2e_test.py      # 画面 11項�
   - 両方 LINE ありはまとめない
 - 表は変えない（関所だけ）。関所：`admin_customer_dupes`・`admin_customer_merge`（権限 customers）
 - 確かめ：`tests/cust_merge_test.ts`（関所 4項目）・`tests/e2e_cust_merge_test.py`（画面 10項目）
+
+## 2026-11-09 休みの日に「年末年始」「臨時休業」などを出す（marker: lifeplus-off-label-v1）
+- お客さまの予約カレンダー：1日まるごとの休みにお知らせ（notice）が付いていれば、「休」の代わりに短い言葉を出す（メモは出さない）
+- 管理画面「休み」のカレンダー・予約表の月のカレンダー：「休」の代わりに、お知らせ（無ければメモ）の短い言葉を出す。4文字以上は半分ずつ2行
+- 管理画面のその日の予約表：1日まるごとの休みの日は、上に「終日お休み　年末年始のお休み（メモ）」と大きく出す。時間の帯にもお知らせを出す
+- 短い言葉の作り方（offShort）：終わりの「のお休み」「お休み」「のため休み」「休み」などを外して6文字まで（「年末年始のお休み」→「年末年始」、「お盆休み」→「お盆」、「臨時休業」→「臨時休業」）
+- 表は変えない（関所と画面だけ）。関所：`month` の days に label、`admin_month` の days に offLabel、`admin_day` の closures に notice
+- 確かめ：`tests/off_label_test.ts`（関所 4項目）・`tests/e2e_off_label_test.py`（画面 10項目）
+
+## 2026-11-09 何日も続く休みは月のカレンダーで線を引く（marker: lifeplus-off-band-v1）
+- 期間で入れた休み（2日以上）は、月のカレンダー（お客さまの予約カレンダー／管理画面の休みのカレンダー／予約表の月のカレンダー）で、その期間に横線を引く
+- 休みの名前は線の頭に1回だけ出す（週をまたぐときは週ごとに線を引き、名前は最初の週だけ）
+- サーバーは `month` の各日に `range {from,to}`、`admin_month` の各日に `offRange` を返す
+- テスト: tests/e2e_off_label_test.py

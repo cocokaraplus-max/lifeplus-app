@@ -129,6 +129,13 @@ async function adminIds(sql: Sql): Promise<string[]> {
 
 // ---------- 休みのお知らせ（予約カレンダーに出す）  marker: lifeplus-closure-notice-v1 ----------
 function dayLabel(ymd: string): string { return `${Number(ymd.slice(5, 7))}/${Number(ymd.slice(8, 10))}（${WEEKDAYS[isoWeekday(ymd) % 7]}）`; }
+// lifeplus-off-label-v1: カレンダーのマスに出す短い言葉（「年末年始のお休み」→「年末年始」・「臨時休業」→「臨時休業」）
+export function offShort(t: unknown): string {
+  const s = String(t ?? "").normalize("NFKC").replace(/\s+/g, "");
+  if (!s) return "";
+  const cut = s.replace(/(のため(の)?(お)?休み|のため休業|の(お)?休み|(お)?休み)$/, "");
+  return (cut || s).slice(0, 6);
+}
 function closureView(c: Record<string, unknown>) {
   const s = c.starts_at as Date, e = c.ends_at as Date;
   const date = jstDate(s), endDate = jstDate(new Date(e.getTime() - 1));
@@ -898,6 +905,19 @@ export async function handle(body: any, deps: Deps): Promise<Record<string, unkn
       const openW = new Set(hours.map((h: Record<string, unknown>) => Number(h.weekday)));
       const first = ym + "-01";
       const extraD = new Set((await extrasBetween(sql, first, addDays(first, 31))).filter((x) => x.kind === "public").map((x) => x.date));   // lifeplus-extra-hours-v1
+      // lifeplus-off-label-v1: 1日まるごとの休みにお知らせが付いていれば、その日の「休」の代わりに短い言葉を出す（メモは出さない）
+      const lab = await sql`select starts_at, ends_at, notice from closures where notice is not null and notice <> ''
+        and tstzrange(starts_at, ends_at, '[)') && tstzrange(${dayRange(first).start}::timestamptz, ${dayRange(addDays(first, 32)).start}::timestamptz, '[)') order by starts_at`;
+      const labelOf = (d: string) => { const r = dayRange(d); const c = lab.find((x: Record<string, unknown>) => (x.starts_at as Date).toISOString() <= r.start && (x.ends_at as Date).toISOString() >= r.end); return c ? offShort(c.notice) : ""; };
+      // lifeplus-off-band-v1: 何日も続く休みは、その休みの最初と最後の日（1日まるごと休みの日だけ）も返す。カレンダーで線を引く
+      const rangeOf = (d: string) => {
+        const r = dayRange(d);
+        const c = lab.find((x: Record<string, unknown>) => (x.starts_at as Date).toISOString() <= r.start && (x.ends_at as Date).toISOString() >= r.end);
+        if (!c) return null;
+        const v = closureView(c);
+        const from = v.from === "00:00" ? v.date : addDays(v.date, 1), to = v.to === "24:00" ? v.endDate : addDays(v.endDate, -1);
+        return from < to ? { from, to } : null;
+      };
       const days = [];
       for (let d = first; d.slice(0, 7) === ym; d = addDays(d, 1)) {
         let state = "off"; let count = 0;
@@ -908,7 +928,8 @@ export async function handle(body: any, deps: Deps): Promise<Record<string, unkn
           const anyHours = await sql`select 1 from closures where tstzrange(starts_at, ends_at, '[)') @> tstzrange(${d + "T00:00:00+09:00"}::timestamptz, ${addDays(d, 1) + "T00:00:00+09:00"}::timestamptz, '[)') limit 1`;
           state = anyHours.length ? "off" : count === 0 ? "full" : count <= 2 ? "few" : "open";
         }
-        days.push({ date: d, day: Number(d.slice(8)), weekday: WEEKDAYS[isoWeekday(d) % 7], state, count });
+        days.push({ date: d, day: Number(d.slice(8)), weekday: WEEKDAYS[isoWeekday(d) % 7], state, count, label: state === "off" ? labelOf(d) : "",
+          range: state === "off" || state === "out" ? rangeOf(d) : null });   // lifeplus-off-label-v1 / lifeplus-off-band-v1
       }
       const prevM = addDays(first, -1).slice(0, 7);
       const nextM = addDays(addDays(first, 31).slice(0, 7) + "-01", 0).slice(0, 7);
@@ -1111,7 +1132,7 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
       const { start, end } = dayRange(d);
       const list = await bookingsWhere(sql, sql`b.starts_at >= ${start}::timestamptz and b.starts_at < ${end}::timestamptz and b.status not in ('cancelled','rejected')`);
       const closures = await sql`
-        select id, starts_at, ends_at, note from closures
+        select id, starts_at, ends_at, note, notice from closures
         where tstzrange(starts_at, ends_at, '[)') && tstzrange(${start}::timestamptz, ${end}::timestamptz, '[)') order by starts_at`;
       // lifeplus-hours-kind-v1: hours＝お客さまに見せる受付時間、staffHours＝手入力だけの時間（予約表にうっすら出す）
       const hours = await sql`select kind, o, c from (
@@ -1126,7 +1147,7 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
         closures: closures.map((c: Record<string, unknown>) => {
           const s = c.starts_at as Date, e = c.ends_at as Date;
           return {
-            id: c.id, from: jstDate(s) < d ? "00:00" : jstTime(s), to: jstDate(e) > d ? "24:00" : jstTime(e), note: c.note ?? "",
+            id: c.id, from: jstDate(s) < d ? "00:00" : jstTime(s), to: jstDate(e) > d ? "24:00" : jstTime(e), note: c.note ?? "", notice: c.notice ?? "",   // lifeplus-off-label-v1
             startDate: jstDate(s), endDate: jstDate(new Date(e.getTime() - 1)),
           };
         }),
@@ -1149,7 +1170,7 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
                count(*) filter (where status in ('pending','confirmed','done','no_show','late_cancel'))::int as n,
                count(*) filter (where status = 'pending')::int as p
         from bookings where starts_at >= ${s}::timestamptz and starts_at < ${e}::timestamptz group by 1`;
-      const cl = await sql`select starts_at, ends_at from closures where tstzrange(starts_at, ends_at, '[)') && tstzrange(${s}::timestamptz, ${e}::timestamptz, '[)')`;
+      const cl = await sql`select starts_at, ends_at, notice, note from closures where tstzrange(starts_at, ends_at, '[)') && tstzrange(${s}::timestamptz, ${e}::timestamptz, '[)')`;   // lifeplus-off-label-v1: notice・note も
       const hours = await sql`select distinct weekday, kind from business_hours`;  // lifeplus-hours-kind-v1
       const openW = new Set(hours.filter((h: Record<string, unknown>) => h.kind === "public").map((h: Record<string, unknown>) => Number(h.weekday)));
       const staffW = new Set(hours.filter((h: Record<string, unknown>) => h.kind === "staff").map((h: Record<string, unknown>) => Number(h.weekday)));
@@ -1161,7 +1182,16 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
         const b = bk.find((x: Record<string, unknown>) => x.d === d);
         const whole = cl.some((c: Record<string, unknown>) => (c.starts_at as Date).toISOString() <= r.start && (c.ends_at as Date).toISOString() >= r.end);
         const part = !whole && cl.some((c: Record<string, unknown>) => (c.starts_at as Date).toISOString() < r.end && (c.ends_at as Date).toISOString() > r.start);
-        days.push({ date: d, open: openW.has(isoWeekday(d)) || exP.has(d), staff: staffW.has(isoWeekday(d)) || exS.has(d), extra: exP.has(d) || exS.has(d), count: b ? b.n : 0, pending: b ? b.p : 0, off: whole ? "all" : part ? "part" : "" });
+        const wc = whole ? cl.find((c: Record<string, unknown>) => (c.starts_at as Date).toISOString() <= r.start && (c.ends_at as Date).toISOString() >= r.end && (c.notice || c.note)) : null;
+        days.push({ date: d, open: openW.has(isoWeekday(d)) || exP.has(d), staff: staffW.has(isoWeekday(d)) || exS.has(d), extra: exP.has(d) || exS.has(d), count: b ? b.n : 0, pending: b ? b.p : 0, off: whole ? "all" : part ? "part" : "",
+          offLabel: wc ? offShort(wc.notice || wc.note) : "",   // lifeplus-off-label-v1
+          offRange: (() => {   // lifeplus-off-band-v1: 何日も続く休みなら、その最初と最後の日（1日まるごと休みの日だけ）
+            const c = whole ? cl.find((x: Record<string, unknown>) => (x.starts_at as Date).toISOString() <= r.start && (x.ends_at as Date).toISOString() >= r.end) : null;
+            if (!c) return null;
+            const v = closureView(c);
+            const from = v.from === "00:00" ? v.date : addDays(v.date, 1), to = v.to === "24:00" ? v.endDate : addDays(v.endDate, -1);
+            return from < to ? { from, to } : null;
+          })() });
       }
       return { month: ym, lead: isoWeekday(first) % 7, days };
     }
