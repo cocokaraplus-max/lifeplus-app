@@ -129,3 +129,14 @@ deno run -A tests/e2e_server.ts & python3 tests/e2e_test.py      # 画面 11項�
 - 表：`sql/lifeplus_menu_edit_v1.sql`（menus に price_label）。★関所より先に流す（流さないうちに関所を入れ替えると、予約ページが開かなくなる）
 - 関所：`init` の menus に priceLabel、`admin_menus`・`admin_menu_save`・`admin_menu_del`（権限 settings）
 - 確かめ：`tests/menu_edit_test.ts`（関所 6項目）・`tests/e2e_menu_test.py`（画面 10項目）
+
+## 2026-11-09 お客さまを1人にまとめる（marker: lifeplus-cust-merge-v1）
+- 店頭（電話・来院）で入れた方が、あとからLINEで予約すると、名簿に2人になる。それを管理画面の「お客さま」でまとめる（お客さまの権限）
+  - お客さまを開くと、電話番号かフリガナが同じ登録があれば「同じ方かもしれない登録があります」と出る →［まとめる］
+  - 候補に出ないときは、いちばん下の「ほかの登録とまとめる」から探して選ぶ
+- まとめ方：LINE のある方を残す（どちらにも無ければ開いていた方）。消える方の予約の履歴（これからの予約も）を残す方へ移し、メモはつなげる。通院中・ブロックはどちらかが付いていれば付ける。電話番号など空いている欄は、もう一方から入れる
+  - お名前が違うときは、どちらを残すか選ぶ（店頭で入れたお名前が先に選ばれている。フリガナも一緒に）
+  - カルテ番号が両方にあって違うときは、どちらを残すか選ぶ
+  - 両方 LINE ありはまとめない
+- 表は変えない（関所だけ）。関所：`admin_customer_dupes`・`admin_customer_merge`（権限 customers）
+- 確かめ：`tests/cust_merge_test.ts`（関所 4項目）・`tests/e2e_cust_merge_test.py`（画面 10項目）

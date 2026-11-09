@@ -176,6 +176,7 @@ const PERM_OF: Record<string, string | null> = {
   admin_decide: "bookings", admin_outcome: "bookings", admin_cancel: "bookings", admin_slots: "bookings", admin_book: "bookings", admin_customer_by_chart: "bookings",   // lifeplus-chart-no-v1
   admin_reschedule: "bookings",   // lifeplus-booking-edit-v1
   admin_customers: "customers", admin_customer: "customers", admin_customer_update: "customers", admin_message: "customers",
+  admin_customer_dupes: "customers", admin_customer_merge: "customers",   // lifeplus-cust-merge-v1
   admin_customer_delete: "customers",
   // device-perms-v2: スタッフ・端末の管理と、設定。★お店の端末だけが持てる（LINE のスタッフは持てない：staff_perms_ok）
   admin_staff: "staff", admin_staff_invite: "staff", admin_staff_update: "staff", admin_staff_del: "staff",
@@ -1319,6 +1320,59 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
       return { ok: true };
     }
 
+    // lifeplus-cust-merge-v1: 同じ人かもしれない登録（電話番号かフリガナが同じ）を探す。店頭で入れた方が、あとでLINEで予約したときなど
+    case "admin_customer_dupes": {
+      const id = str(body.customerId, 40);
+      if (!UUID_RE.test(id)) throw new ApiError("customer_not_found");
+      const cur = await sql`select * from customers where id = ${id}::uuid`;
+      if (!cur.length) throw new ApiError("customer_not_found", 404);
+      const c = cur[0];
+      const kana = String(c.name_kana ?? "").replace(/[\s　]/g, "");
+      const rows = await sql`
+        select c.id, c.name, c.name_kana, c.phone, c.line_user_id, c.chart_no, coalesce(st.visits, 0) as visits,
+          (${c.phone ?? ""} <> '' and c.phone = ${c.phone ?? ""}) as same_phone,
+          (${kana} <> '' and replace(replace(coalesce(c.name_kana, ''), ' ', ''), '　', '') = ${kana}) as same_kana
+        from customers c left join customer_stats st on st.customer_id = c.id
+        where c.id <> ${id}::uuid and c.name is not null
+          and ((${c.phone ?? ""} <> '' and c.phone = ${c.phone ?? ""})
+            or (${kana} <> '' and replace(replace(coalesce(c.name_kana, ''), ' ', ''), '　', '') = ${kana}))
+        order by c.created_at limit 5`;
+      return { dupes: rows.map((r: Record<string, unknown>) => ({ id: r.id, name: r.name, kana: r.name_kana ?? "", phone: r.phone ?? "",
+        hasLine: !!r.line_user_id, chartNo: r.chart_no ?? "", visits: Number(r.visits), samePhone: !!r.same_phone, sameKana: !!r.same_kana })) };
+    }
+    // lifeplus-cust-merge-v1: 2つの登録を1人にまとめる。予約の履歴は全部残す。LINE は1人分だけ（両方LINEありはまとめない）
+    //   残すのは LINE のある方（どちらにも無ければ、開いていた方＝customerId）。空いている欄は、もう一方から埋める
+    //   カルテ番号が両方にあって違うときは、chartFrom（"keep"＝残す方の番号／"other"＝消える方の番号）で選ぶ
+    case "admin_customer_merge": {
+      const aId = str(body.customerId, 40), bId = str(body.otherId, 40);
+      if (!UUID_RE.test(aId) || !UUID_RE.test(bId) || aId === bId) throw new ApiError("customer_not_found");
+      const out = await sql.begin(async (tx: Sql) => {
+        const rows = await tx`select * from customers where id in (${aId}::uuid, ${bId}::uuid) for update`;
+        const a = rows.find((r: Record<string, any>) => r.id === aId), b = rows.find((r: Record<string, any>) => r.id === bId);
+        if (!a || !b) throw new ApiError("customer_not_found", 404);
+        if (a.line_user_id && b.line_user_id) throw new ApiError("merge_both_line", 409);
+        const keep = b.line_user_id && !a.line_user_id ? b : a, gone = keep === a ? b : a;
+        let chart = keep.chart_no ?? gone.chart_no ?? null;
+        if (keep.chart_no && gone.chart_no && keep.chart_no !== gone.chart_no) {
+          if (body.chartFrom !== "keep" && body.chartFrom !== "other") throw new ApiError("merge_chart_choose", 409);
+          chart = body.chartFrom === "other" ? gone.chart_no : keep.chart_no;
+        }
+        const memo = [keep.memo, gone.memo].filter((x) => x && String(x).trim()).join("\n").slice(0, 500) || null;
+        const moved = await tx`update bookings set customer_id = ${keep.id}::uuid where customer_id = ${gone.id}::uuid returning id`;
+        await tx`update customers set chart_no = null where id = ${gone.id}::uuid`;
+        await tx`delete from customers where id = ${gone.id}::uuid`;
+        // お名前が違うときは nameFrom（"keep"＝残す方／"other"＝消える方。フリガナも一緒に）で選べる。送られてこなければ残す方
+        const useOther = body.nameFrom === "other" && gone.name;
+        const nm = useOther ? gone.name : (keep.name ?? gone.name), kn = useOther ? (gone.name_kana ?? keep.name_kana) : (keep.name_kana ?? gone.name_kana);
+        await tx`update customers set
+            name = ${nm}, name_kana = ${kn}, phone = ${keep.phone ?? gone.phone},
+            line_name = ${keep.line_name ?? gone.line_name}, chart_no = ${chart}, memo = ${memo},
+            is_returning = ${!!(keep.is_returning || gone.is_returning)}, is_blocked = ${!!(keep.is_blocked || gone.is_blocked)}
+          where id = ${keep.id}::uuid`;
+        return { keepId: keep.id as string, moved: moved.length };
+      });
+      return { ok: true, ...out };
+    }
     case "admin_customer_by_chart": {   // lifeplus-chart-no-v1: カルテ番号で、登録済みの方を呼び出す
       const no = chartNo(body.chartNo);
       if (!no) return { customer: null };

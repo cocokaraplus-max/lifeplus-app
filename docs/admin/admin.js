@@ -41,6 +41,8 @@
     booking_not_pending: "この予約はもう確認済みです。",
     booking_not_found: "この予約は見つかりませんでした。",
     customer_not_found: "このお客さまは見つかりませんでした。",
+    merge_both_line: "どちらもLINEでつながっている方なので、まとめられません。",   // lifeplus-cust-merge-v1
+    merge_chart_choose: "カルテ番号が2つあります。残す番号を選んでください。",
     site_voice_name: "呼び名を入れてください。",   // lifeplus-site-voices-v1
     site_video_invalid: "動画の URL が読めませんでした。YouTube の「共有」でコピーした URL を貼ってください。",
     chart_dup: "このカルテ番号は、ほかの方に使われています。番号を確かめてください。",   // lifeplus-chart-no-v1
@@ -989,6 +991,7 @@
       return api("admin_customer", { customerId: id }).then(function (hst) {
         A.hist = hst.bookings;
         openSheet("<h3>" + esc(c.name) + "</h3>" + (c.kana ? '<div class="kana">' + esc(c.kana) + "</div>" : "") +
+          '<div id="dupes"></div>' +   // lifeplus-cust-merge-v1: 同じ人かもしれない登録
           (can("customers") ? '<button class="btn small" id="tce" style="margin:6px 0 2px">お名前・フリガナ・電話・カルテ番号を直す</button>' : "") +   // lifeplus-cust-edit-v1
           '<div class="counts"><span class="pill reg">来院 ' + c.visits + "回</span>" +
             (c.noShows ? '<span class="pill ns">無断 ' + c.noShows + "回</span>" : "") +
@@ -1009,7 +1012,19 @@
             return '<button class="h" data-bk="' + esc(b.id) + '" style="width:100%;background:none;border:0;border-bottom:1px solid var(--line);text-align:left"><span>' + mds(b.date) + "（" + WD[wdOf(b.date)] + "）" + esc(b.time) + "　" + esc(b.menuName) + "</span><b>" + esc(STATUS[b.status] || b.status) + "</b></button>";
           }).join("") : '<p class="note">まだ予約はありません。</p>') + "</div>" +
           // customer-delete-staff-v1: HIROさんは誰でも。お客さまの権限がある端末・スタッフは、手で入れた人（LINEなし）だけ
+          (can("customers") ? '<div style="text-align:center;margin-top:14px"><button class="link" id="tmg">ほかの登録とまとめる（店頭で入れた方が、あとでLINEで予約したときなど）</button></div>' : "") +   // lifeplus-cust-merge-v1
           (owner() || (can("customers") && !c.hasLine) ? '<div class="danger-zone" style="text-align:center;margin-top:16px"><button class="link red" id="tdel">この方を消す（テストや間違いで入れた人など）</button></div>' : ""));
+        if (can("customers")) {   // lifeplus-cust-merge-v1
+          api("admin_customer_dupes", { customerId: c.id }).then(function (r) {
+            var box = $("#dupes"); if (!box || !r.dupes.length) return;
+            box.innerHTML = '<div class="dupe-note"><b>同じ方かもしれない登録があります</b>' + r.dupes.map(function (d, i) {
+              return '<div class="dupe"><span>' + esc(d.name) + "<small>" + esc([d.samePhone ? "電話が同じ" : "", d.sameKana ? "フリガナが同じ" : "", d.hasLine ? "LINEあり" : "LINEなし",
+                d.chartNo ? "カルテ " + d.chartNo : "", "来院 " + d.visits + "回"].filter(Boolean).join("・")) + '</small></span><button class="btn small" data-dmg="' + i + '">まとめる</button></div>';
+            }).join("") + "</div>";
+            on("[data-dmg]", function (el) { mergeConfirm(c, r.dupes[Number(el.getAttribute("data-dmg"))]); }, box);
+          }, function () {});
+          $("#tmg").onclick = function () { mergePick(c); };
+        }
         $("#ts").onclick = function () {
           busy($("#ts"), api("admin_customer_update", { customerId: c.id, isReturning: $("#tr").checked, isBlocked: $("#tb").checked, memo: $("#tm").value })).then(function () {
             c.isReturning = $("#tr").checked; c.isBlocked = $("#tb").checked; c.memo = $("#tm").value;
@@ -1033,6 +1048,61 @@
         on("[data-bk]", function (el) { slip(el.getAttribute("data-bk"), hst.bookings); }, $sb);
       });
     }).catch(fail);
+  }
+
+  // lifeplus-cust-merge-v1: 2つの登録を1人にまとめる
+  function mergePick(c) {
+    openSheet("<h3>「" + esc(c.name) + "」とまとめる方を選ぶ</h3>" +
+      '<p class="note">同じ方なのに、名簿に2人いるときに使います。お名前・フリガナ・電話番号・カルテ番号で探せます。</p>' +
+      '<input class="search" id="mq" type="search" placeholder="名前・フリガナ・電話番号・カルテ番号" aria-label="まとめる方を探す">' +
+      '<div class="card" id="ml" style="padding:4px 12px"><div class="empty">探す言葉を入れてください</div></div>' +
+      '<button class="btn gray wide" id="mno">やめる</button>');
+    $("#mno").onclick = function () { closeSheet(); custSheet(c.id); };
+    var t, list = [];
+    $("#mq").oninput = function () {
+      var q = this.value.trim(); clearTimeout(t);
+      if (!q) { $("#ml").innerHTML = '<div class="empty">探す言葉を入れてください</div>'; return; }
+      t = setTimeout(function () {
+        api("admin_customers", { q: q }).then(function (r) {
+          list = r.customers.filter(function (x) { return x.id !== c.id; });
+          $("#ml").innerHTML = list.length ? list.map(function (x, i) {
+            return '<button class="cust" data-mp="' + i + '"><span class="av">' + esc((x.name || "？").slice(0, 1)) + '</span><span class="g"><span class="nm">' + esc(x.name) + "</span><br>" +
+              '<span class="sb">' + esc([x.chartNo ? "No." + x.chartNo : "", x.kana, x.phone ? telText(x.phone) : "", x.hasLine ? "LINEあり" : "LINEなし", "来院 " + x.visits + "回"].filter(Boolean).join("　")) + "</span></span></button>";
+          }).join("") : '<div class="empty">見つかりませんでした。</div>';
+          on("[data-mp]", function (el) { mergeConfirm(c, list[Number(el.getAttribute("data-mp"))]); }, $("#ml"));
+        }, fail);
+      }, 300);
+    };
+  }
+  function mergeConfirm(c, d) {
+    if (c.hasLine && d.hasLine) { toast(ERR.merge_both_line); return; }
+    var keep = d.hasLine && !c.hasLine ? d : c, gone = keep === c ? d : c;
+    var both = keep.chartNo && gone.chartNo && keep.chartNo !== gone.chartNo;
+    var nmDiff = keep.name && gone.name && keep.name !== gone.name;
+    var nf = nmDiff && keep.hasLine && !gone.hasLine ? "other" : "keep";   // 店頭で入れたお名前（漢字のことが多い）を先に選んでおく
+    openSheet("<h3>1人にまとめますか？</h3>" +
+      '<dl class="facts"><div><dt>残す方</dt><dd>' + esc(keep.name) + "（" + (keep.hasLine ? "LINEあり" : "LINEなし") + "）</dd></div>" +
+      "<div><dt>まとめて消える方</dt><dd>" + esc(gone.name) + "（" + (gone.hasLine ? "LINEあり" : "LINEなし") + "）</dd></div></dl>" +
+      '<p class="note">消える方の予約の履歴（これからの予約も）・メモは、残す方に移ります。お名前・フリガナ・電話番号は残す方のものを使い、空いていれば消える方から入れます。' +
+      (keep.hasLine || gone.hasLine ? "LINE のある方を残すので、これからの予約のお知らせもLINEに届きます。" : "") + "元に戻せません。</p>" +
+      (nmDiff ? '<div class="f"><span>お名前が違います。残すお名前を選んでください（フリガナも一緒に）</span><div class="chips" role="radiogroup">' +
+        '<button class="chip' + (nf === "keep" ? " on" : "") + '" data-nf="keep" role="radio" aria-checked="' + (nf === "keep") + '">' + esc(keep.name) + "</button>" +
+        '<button class="chip' + (nf === "other" ? " on" : "") + '" data-nf="other" role="radio" aria-checked="' + (nf === "other") + '">' + esc(gone.name) + "</button></div></div>" : "") +
+      (both ? '<div class="f"><span>カルテ番号が2つあります。残す番号を選んでください</span><div class="chips" role="radiogroup">' +
+        '<button class="chip on" data-cf="keep" role="radio" aria-checked="true">' + esc(keep.chartNo) + '</button><button class="chip" data-cf="other" role="radio" aria-checked="false">' + esc(gone.chartNo) + "</button></div></div>" : "") +
+      '<button class="btn mint wide" id="mgok">まとめる</button><button class="btn gray wide" id="mgno">やめる</button>');
+    var cf = "keep";
+    on("[data-nf]", function (el) { nf = el.getAttribute("data-nf"); $$("[data-nf]", $sb).forEach(function (b) { var y = b === el; b.classList.toggle("on", y); b.setAttribute("aria-checked", String(y)); }); }, $sb);
+    on("[data-cf]", function (el) { cf = el.getAttribute("data-cf"); $$("[data-cf]", $sb).forEach(function (b) { var y = b === el; b.classList.toggle("on", y); b.setAttribute("aria-checked", String(y)); }); }, $sb);
+    $("#mgno").onclick = function () { closeSheet(); custSheet(c.id); };
+    $("#mgok").onclick = function () {
+      busy($("#mgok"), api("admin_customer_merge", { customerId: c.id, otherId: d.id, chartFrom: both ? cf : undefined, nameFrom: nmDiff ? (keep === c ? nf : (nf === "keep" ? "keep" : "other")) : undefined })).then(function (r) {
+        toast("1人にまとめました（予約の履歴 " + r.moved + "件を移しました）");
+        A.custs = null; closeSheet();
+        if (A.tab === "cust") loadCust();
+        custSheet(r.keepId);
+      }, fail);
+    };
   }
 
   // =============================================================

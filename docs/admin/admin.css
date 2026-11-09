@@ -353,3 +353,11 @@ button, a { -webkit-tap-highlight-color: rgba(29, 78, 216, .18); }
 .mi-off { font-style: normal; font-size: 12px; font-weight: 700; color: #9a5b00; background: #fff4dc; border-radius: 999px; padding: 1px 8px; }
 .mi-m { font-size: 13.5px; color: var(--mute); }
 .mi-d { font-size: 13px; color: var(--mute); }
+
+/* ---------- お客さまをまとめる  marker: lifeplus-cust-merge-v1 ---------- */
+.dupe-note { margin: 8px 0 4px; padding: 10px 12px; border-radius: 12px; background: var(--amber-soft); color: #7a4b00; }
+.dupe-note > b { display: block; font-size: 14px; margin-bottom: 6px; }
+.dupe { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px dashed rgba(122,75,0,.25); }
+.dupe span { font-weight: 700; color: var(--ink); }
+.dupe small { display: block; font-weight: 400; font-size: 12.5px; color: #7a4b00; }
+.dupe .btn.small { flex: none; }
