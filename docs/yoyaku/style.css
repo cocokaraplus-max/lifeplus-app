@@ -196,26 +196,31 @@ button.cal-d.on i { color: #fff; }
 
 /* ---------- 何日も続く休みを線で示す  marker: lifeplus-off-band-v1（見た目は下の lifeplus-off-band-v2 に置きかえ） ---------- */
 
-/* ---------- 休みの帯を、休みらしく（marker: lifeplus-off-band-v2） ----------
-   ・カレンダーの祝日のような、やわらかい赤のななめ縞の帯を、休みの日の後ろに通す
-   ・帯は段（日〜土・月の終わり）ごとに1本。段の頭のマスから段の幅いっぱいに引くので、つなぎ目が出ない
-   ・期間の始まりと終わりは丸く、前の段・次の段へ続くところは角のまま。休みの名前は「☾ 年末年始」の札で1回だけ */
-.cal-d.inband { position: relative; overflow: visible; background: transparent !important; border-color: transparent !important; box-shadow: none !important; color: #be185d; }
+/* lifeplus-off-band-v2 の見た目は、下の lifeplus-off-band-v3 に置きかえ */
+/* ---------- 休みの帯（marker: lifeplus-off-band-v3） ----------
+   ・うすい赤の面をマスの後ろに1枚だけ敷き、下に細い線を1本通す。名前は線の真ん中に小さく（―― 年末年始 ――）
+   ・帯は段（日〜土・月の終わり）ごとに1本。期間の始まりと終わりは丸く、次の段へ続くところは角のまま */
+.cal-d.inband { position: relative; overflow: visible; background: transparent !important; border-color: transparent !important; box-shadow: none !important; color: #c2185b; }
 .cal-d.inband::after { display: none; }
 .cal-d.inband > * { position: relative; z-index: 1; }
 .cal-d.inband > i { visibility: hidden; }
-.cal-d .band { --l: 0px; --r: 0px; position: absolute !important; z-index: 0 !important; top: 1px; bottom: 1px; height: auto; opacity: 1; pointer-events: none;
+.cal-d .band { --l: 0px; --r: 0px; position: absolute !important; z-index: 0 !important; top: 2px; bottom: 2px; height: auto; opacity: 1; pointer-events: none;
   left: calc(-2px + var(--l)); right: auto;
   width: calc(var(--seg) * (100% + 4px) + (var(--seg) - 1) * 4px - var(--l) - var(--r));
-  background: repeating-linear-gradient(135deg, rgba(225, 29, 72, .13) 0 5px, rgba(225, 29, 72, .04) 5px 10px);
-  border: 1px solid rgba(225, 29, 72, .22); border-left-color: transparent; border-right-color: transparent; border-radius: 0; }
-.cal-d .band.bs { --l: 2px; border-left-color: rgba(225, 29, 72, .22); border-top-left-radius: 14px; border-bottom-left-radius: 14px; }
-.cal-d .band.be { --r: 2px; border-right-color: rgba(225, 29, 72, .22); border-top-right-radius: 14px; border-bottom-right-radius: 14px; }
+  background: rgba(225, 29, 72, .065); border: 0; border-radius: 0; }
+.cal-d .band.bs { --l: 2px; border-top-left-radius: 12px; border-bottom-left-radius: 12px; }
+.cal-d .band.be { --r: 2px; border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
+/* 名前のない段は、線だけ */
+.cal-d .band::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 11px; height: 1px; background: rgba(194, 24, 91, .45); }
+.cal-d .band.has-l::after { display: none; }
 .cal-d .band-l { position: absolute !important; z-index: 2 !important; left: -2px; bottom: 5px; right: auto;
-  width: calc(var(--seg) * (100% + 4px) + (var(--seg) - 1) * 4px);
-  display: flex; justify-content: center; pointer-events: none; font-style: normal; color: inherit; overflow: visible; }
-.cal-d .band-l > span { max-width: calc(100% - 8px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: 11px; line-height: 1; font-weight: 800; letter-spacing: .02em; color: #be185d;
-  background: #fff; border: 1px solid rgba(225, 29, 72, .28); border-radius: 999px; padding: 3px 7px 3px 5px;
-  box-shadow: 0 1px 2px rgba(190, 24, 93, .12); }
-.cal-d .band-l > span::before { content: "☾"; margin-right: 2px; font-weight: 400; }
+  width: calc(var(--seg) * (100% + 4px) + (var(--seg) - 1) * 4px); padding: 0 12px; box-sizing: border-box;
+  display: flex; align-items: center; gap: 6px; pointer-events: none; font-style: normal; overflow: hidden; }
+.cal-d .band-l::before, .cal-d .band-l::after { content: ""; flex: 1 1 0; min-width: 6px; height: 1px; background: rgba(194, 24, 91, .45); }
+.cal-d .band-l > span { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 10.5px; line-height: 13px; font-weight: 700; letter-spacing: .12em; color: #c2185b; }
+/* 次の段へ続くところは、線もマスの端まで通す */
+.cal-d .band:not(.bs)::after { left: 0; }
+.cal-d .band:not(.be)::after { right: 0; }
+.cal-d .band-l.cl { padding-left: 0; }
+.cal-d .band-l.cr { padding-right: 0; }

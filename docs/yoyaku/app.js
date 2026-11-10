@@ -270,8 +270,8 @@
   }
   function bandHtml(b, label) {
     if (!b || !b.start) return "";
-    return '<span class="band' + (b.head ? " bs" : "") + (b.tail ? " be" : "") + '" style="--seg:' + b.seg + '" aria-hidden="true"></span>' +
-      (b.label ? '<em class="band-l" style="--seg:' + b.seg + '"><span>' + esc(label || "休み") + "</span></em>" : "");
+    return '<span class="band' + (b.head ? " bs" : "") + (b.tail ? " be" : "") + (b.label ? " has-l" : "") + '" style="--seg:' + b.seg + '" aria-hidden="true"></span>' +
+      (b.label ? '<em class="band-l' + (b.head ? "" : " cl") + (b.tail ? "" : " cr") + '" style="--seg:' + b.seg + '"><span>' + esc(label || "休み") + "</span></em>" : "");
   }
 
   function loadMonth(month) {
