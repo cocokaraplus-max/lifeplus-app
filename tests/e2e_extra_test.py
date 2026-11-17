@@ -63,7 +63,7 @@ with sync_playwright() as p:
     row = pg.locator(".offl").first.locator(".oi").first
     check("臨時の受付日の一覧に出る", "10月20日（火）" in row.inner_text() and "10:00〜12:00" in row.inner_text() and "振替" in row.inner_text() and "臨時で受付します" in row.inner_text())
     d20 = pg.locator('[data-off="2026-10-20"]')
-    check("カレンダーで10/20が「臨時」の受付日になる", d20.count() == 1 and "extra" in d20.get_attribute("class") and "臨時" in d20.inner_text())
+    check("カレンダーで10/20が「臨時受付」の受付日になる", d20.count() == 1 and "extra" in d20.get_attribute("class") and d20.inner_text().replace("\n", "").endswith("臨時受付"))
 
     # 2. お客さまの予約カレンダー
     cp = new_ctx("pat").new_page()

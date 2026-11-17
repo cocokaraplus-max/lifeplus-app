@@ -783,7 +783,7 @@
       var wc = whole ? cs.filter(function (c) { return wholeDay(c, ymd); })[0] : null;   // lifeplus-off-band-v1
       var rg = wc ? { from: wc.from === "00:00" ? wc.date : addDays(wc.date, 1), to: wc.to === "24:00" ? wc.endDate : addDays(wc.endDate, -1) } : null;
       var bd = rg && rg.from < rg.to ? bandOf(ymd, rg, days) : null;
-      var mark = !hasH ? (whole ? (wl || "休") : ex ? "臨時" : "") : whole ? (wl || "休") : cs.length ? "一部" : ex ? "臨時" : "";
+      var mark = !hasH ? (whole ? (wl || "休") : ex ? "臨時受付" : "") : whole ? (wl || "休") : cs.length ? "一部" : ex ? "臨時受付" : "";
       if (wl) cls += " lbl";
       if (ex && !whole) cls += " extra";
       var noticed = cs.some(function (c) { return c.notice; }) || extrasOn(ymd).some(function (x) { return x.notice; });
