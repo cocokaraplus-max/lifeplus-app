@@ -69,9 +69,10 @@ with sync_playwright() as p:
     bk = cp.locator(".bk")
     check("お客さま：締め切りを過ぎた予約（13:00）には取り消しのボタンが無い", bk.nth(0).locator("[data-cancel]").count() == 0 and "1時間30分前" in bk.nth(0).inner_text())
     check("お客さま：まだの予約（14:30）は取り消せる", bk.nth(1).locator("[data-cancel]").count() == 1)
-    check("お客さま：下に「キャンセルについて」（たたんである）", cp.locator("details.policy").count() == 1 and not cp.locator(".policy-b").is_visible())
-    cp.locator("details.policy summary").click()
-    check("お客さま：開くと案内（今の値入り）", "開始の1時間30分前まで" in cp.locator(".policy-b").inner_text())
+    pol = cp.locator(".policy")
+    check("お客さま：ご予約の下に「キャンセルについての注意事項」がいつも出る（たたまない）", pol.count() == 1 and cp.locator(".policy-b").is_visible()
+          and pol.bounding_box()["y"] > bk.nth(1).bounding_box()["y"] and pol.bounding_box()["y"] < cp.get_by_role("button", name="新しく予約する").bounding_box()["y"])
+    check("お客さま：案内は箇条書き（今の値入り）", cp.locator(".policy-b li").count() == 3 and "開始の1時間30分前まで" in cp.locator(".policy-b").inner_text())
     cp.screenshot(path=f"{SHOTS}/c02_home.png", full_page=True)
     # 3. 予約の確認画面にも案内
     cp.get_by_role("button", name="新しく予約する").click()
@@ -82,10 +83,28 @@ with sync_playwright() as p:
     go = cp.get_by_role("button", name="確認へ進む")
     if go.count(): go.click()
     expect(cp.get_by_role("heading", name="この内容で予約しますか？")).to_be_visible()
-    pol = cp.locator(".card.policy")
+    pol = cp.locator(".policy")
     check("確認画面：「予約する」の前に案内（開いたまま）", pol.count() == 1 and pol.is_visible() and "キャンセルについて" in pol.inner_text())
     check("確認画面：案内は「予約する」より上", pol.bounding_box()["y"] < cp.get_by_role("button", name="予約する").bounding_box()["y"])
     cp.screenshot(path=f"{SHOTS}/c03_confirm.png", full_page=True)
+    # lifeplus-cancel-note-v2: 予約した画面にも出る
+    cp.get_by_role("button", name="予約する").click()
+    expect(cp.get_by_role("heading", name="仮予約を受け付けました")).to_be_visible()
+    check("予約した画面：注意事項が出る", cp.locator(".policy").count() == 1 and cp.locator(".policy-b").is_visible())
+    cp.screenshot(path=f"{SHOTS}/c04_done.png", full_page=True)
+    # lifeplus-menu-layout-v1: スマホで、文字を「特大」にしてもメニューの名前がつぶれない
+    cp.goto(BASE + "/yoyaku/"); expect(cp.locator(".bk").first).to_be_visible()
+    cp.locator("[data-size='1.4']").click()
+    cp.get_by_role("button", name="新しく予約する").click(); cp.locator("[data-biz=mominoki]").click()
+    expect(cp.locator("[data-menu]").first).to_be_visible()
+    names = cp.locator(".choice.menu:has(.price-l) .name")
+    ws = [names.nth(i).bounding_box()["width"] for i in range(names.count())]
+    cw = cp.locator(".choice.menu").first.bounding_box()["width"]
+    check("メニュー：言葉の料金は名前の下（名前が横いっぱい）", cp.locator(".choice.menu .price-l").count() >= 1 and min(ws) > cw * 0.6
+          and cp.evaluate("document.documentElement.scrollWidth <= innerWidth"))
+    cp.screenshot(path=f"{SHOTS}/c05_menu_big.png", full_page=True)
+    cp.locator("[data-size='1']").click()
+    cp.screenshot(path=f"{SHOTS}/c06_menu.png", full_page=True)
     # 4. 案内を空にすると、どこにも出ない
     api("hiro", "admin_settings_save", hours=s["hours"], leadMinutes=120, horizonDays=s["horizonDays"], noshowLimit=2, cancelNotice="")
     cp.goto(BASE + "/yoyaku/"); expect(cp.locator(".bk").first).to_be_visible()

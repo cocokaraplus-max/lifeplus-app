@@ -126,9 +126,10 @@
           "</div>";
       });
     }
+    if (bs.length) h += policyHtml();   // lifeplus-cancel-note-v2: ご予約があるときは、予約のすぐ下にいつも出す
     h += '<button class="btn" id="new">新しく予約する</button>';
     if (S.data.profile.complete) h += '<button class="btn ghost" id="prof">お名前・お電話番号の変更</button>';
-    h += policyHtml(false);   // lifeplus-cancel-rule-v1
+    if (!bs.length) h += policyHtml();
     view(h);
     document.getElementById("new").onclick = function () { startBooking(); };
     var pf = document.getElementById("prof");
@@ -140,12 +141,19 @@
 
   // lifeplus-cancel-rule-v1: キャンセルの案内（管理画面で書いた文。空なら出さない）
   function cancelText() { var st = (S.data && S.data.settings) || {}; return st.cancelText || "1時間"; }
-  function policyHtml(open) {
+  function policyHtml() {   // lifeplus-cancel-note-v2: たたまず、いつも「注意事項」として出す
     var t = ((S.data && S.data.settings) || {}).cancelNotice || "";
     if (!t) return "";
-    var body = '<div class="policy-b">' + esc(t).replace(/\n/g, "<br>") + "</div>";
-    return open ? '<div class="card policy"><h3>キャンセルについて</h3>' + body + "</div>"
-      : '<details class="card policy"><summary>キャンセルについて</summary>' + body + "</details>";
+    var lines = t.split("\n").map(function (x) { return x.trim(); }).filter(Boolean), body = "", list = [];
+    var flush = function () { if (list.length) { body += "<ul>" + list.join("") + "</ul>"; list = []; } };
+    lines.forEach(function (x) {
+      var m = x.match(/^[・･\-－*•]\s*(.*)$/);
+      if (m) list.push("<li>" + esc(m[1]) + "</li>"); else { flush(); body += "<p>" + esc(x) + "</p>"; }
+    });
+    flush();
+    return '<section class="policy" aria-label="キャンセルについての注意事項">' +
+      '<div class="policy-h"><span class="policy-i" aria-hidden="true">!</span>キャンセルについての注意事項</div>' +
+      '<div class="policy-b">' + body + "</div></section>";
   }
 
   function cancel(id) {
@@ -231,9 +239,12 @@
     var ms = S.data.menus.filter(function (m) { return m.businessId === S.business.id; });
     var h = '<button class="back" id="back">← もどる</button>' + steps(2) + "<h2>メニューをお選びください</h2>";
     ms.forEach(function (m) {
-      h += '<button class="choice" data-menu="' + esc(m.id) + '"><span class="body"><span class="name">' + esc(m.name) + "</span><br>" +
-        '<span class="meta">' + m.durationMin + "分" + (m.description ? "　" + esc(m.description) : "") + "</span></span>" +
-        '<span class="price">' + priceText(m.priceYen, m.name, m.priceLabel) + "</span></button>";
+      // lifeplus-menu-layout-v1: 料金が「〇〇円」のように短いときは右に、言葉のときは名前の下に出す（スマホで名前がつぶれないように）
+      var pt = priceText(m.priceYen, m.name, m.priceLabel), shortP = pt.length <= 8;
+      h += '<button class="choice menu" data-menu="' + esc(m.id) + '"><span class="body"><span class="name">' + esc(m.name) + "</span>" +
+        '<span class="meta"><span class="min">' + m.durationMin + "分</span>" + (m.description ? '<span class="desc">' + esc(m.description) + "</span>" : "") + "</span>" +
+        (shortP ? "" : '<span class="price-l">' + esc(pt) + "</span>") + "</span>" +
+        (shortP ? '<span class="price">' + esc(pt) + "</span>" : "") + '<span class="chev" aria-hidden="true">›</span></button>';
     });
     view(h);
     document.getElementById("back").onclick = function () { chooseBusiness(); };
@@ -400,7 +411,7 @@
       (p.isReturning ? "" : p.noShowHold
         ? '<div class="info">ご来院のない予約が続いたため、<br>今回は「仮予約」でお預かりします。<br>確定したらLINEでお知らせします。</div>'
         : '<div class="info">初めての方は「仮予約」になります。<br>確定したらLINEでお知らせします。</div>') +
-      policyHtml(true) +   // lifeplus-cancel-rule-v1: 予約する前に、キャンセルの決まりを読んでもらう
+      policyHtml() +   // lifeplus-cancel-rule-v1: 予約する前に、キャンセルの決まりを読んでもらう
       '<button class="btn" id="book">予約する</button>';
     view(h);
     document.getElementById("back").onclick = function () { chooseSymptoms(); };
@@ -425,7 +436,7 @@
       "<h2>" + (ok ? "ご予約が確定しました" : "仮予約を受け付けました") + "</h2>" +
       (b ? "<p><b>" + md(b.date) + "（" + esc(b.weekday) + "）" + esc(b.time) + "〜</b><br>" + esc(b.businessName) + "　" + esc(b.menuName) + "</p>" : "") +
       (ok ? "<p>当日お待ちしております。</p>" : "<p>確定したらLINEでお知らせします。<br>もうしばらくお待ちください。</p>") +
-      "</div>" +
+      "</div>" + policyHtml() +   // lifeplus-cancel-note-v2: 予約した画面にも
       '<button class="btn" id="close">' + (liff.isInClient() ? "閉じる" : "ご予約の状況へ") + "</button>";
     view(h);
     document.getElementById("close").onclick = function () {

@@ -227,11 +227,26 @@ button.cal-d.on i { color: #fff; }
 
 /* ---------- キャンセルの案内・締め切りを過ぎた予約（marker: lifeplus-cancel-rule-v1） ---------- */
 .late-note { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: #f4f5f8; color: #4a5468; font-size: 13.5px; line-height: 1.6; }
-.policy { margin-top: 14px; }
-.policy h3 { margin: 0 0 8px; font-size: 15px; }
-.policy summary { cursor: pointer; font-weight: 700; font-size: 14.5px; color: #4a5468; list-style: none; display: flex; align-items: center; gap: 6px; }
-.policy summary::-webkit-details-marker { display: none; }
-.policy summary::after { content: "＋"; margin-left: auto; color: #8a93a6; }
-.policy[open] summary::after { content: "−"; }
-.policy[open] summary { margin-bottom: 8px; }
-.policy-b { font-size: 14px; line-height: 1.75; color: #3b4458; }
+/* lifeplus-cancel-note-v2: キャンセルの案内は、たたまずに「注意事項」として出す */
+.policy { margin: 4px 0 14px; padding: 14px 16px 12px; border-radius: var(--radius); background: #fff8ec; border: 1px solid #f1d9a8; }
+.policy-h { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 15px; color: #8a5a00; margin-bottom: 8px; }
+.policy-i { width: 20px; height: 20px; flex: none; border-radius: 50%; background: #e89a0c; color: #fff; display: grid; place-items: center;
+  font-size: 13px; font-weight: 900; line-height: 1; }
+.policy-b { font-size: 14px; line-height: 1.7; color: #4a3d22; }
+.policy-b p { margin: 0 0 6px; }
+.policy-b ul { margin: 0; padding: 0; list-style: none; }
+.policy-b li { position: relative; padding-left: 14px; margin: 0 0 6px; }
+.policy-b li:last-child { margin-bottom: 0; }
+.policy-b li::before { content: ""; position: absolute; left: 2px; top: .72em; width: 5px; height: 5px; border-radius: 50%; background: #e89a0c; }
+
+/* ---------- メニューの並び（marker: lifeplus-menu-layout-v1） ----------
+   ・名前は横いっぱいに使う。料金が「4,000円」のように短いときだけ右に、言葉のときは名前の下に小さく出す */
+.choice.menu { align-items: center; }
+.choice.menu .name { display: block; font-size: 17px; line-height: 1.45; text-wrap: wrap; word-break: keep-all; overflow-wrap: anywhere; }
+.choice.menu .meta { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 4px; font-size: 13.5px; line-height: 1.5; }
+.choice.menu .meta .min { flex: none; font-weight: 700; color: #4a5468; }
+.choice.menu .meta .desc { flex: 1 1 12em; min-width: 0; }
+.choice.menu .price { font-size: 16px; flex: none; }
+.choice.menu .price-l { display: inline-block; margin-top: 8px; padding: 3px 10px; border-radius: 999px; background: var(--blue-soft); color: var(--blue);
+  font-size: 13px; font-weight: 700; line-height: 1.5; }
+.choice.menu .chev { flex: none; margin-left: -4px; }

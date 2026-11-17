@@ -173,3 +173,7 @@ deno run -A tests/e2e_server.ts & python3 tests/e2e_test.py      # 画面 11項�
 - 案内の {予約}{取消}{回数} は、今の締め切りと「ドタキャンが何回続いたら仮予約」の回数に置きかえて出す
 - 表は変えない（app_settings に cancel_minutes・cancel_notice を足すだけ。保存したときに入る）
 - テスト: tests/cancel_rule_test.ts・tests/e2e_cancel_rule_test.py
+
+## 2026-11-17 キャンセルの注意事項をいつも見えるように・メニューの並び（marker: lifeplus-cancel-note-v2 / lifeplus-menu-layout-v1）
+- キャンセルの案内は、たたまずに「キャンセルについての注意事項」として出す（ご予約の状況・予約の確認画面・予約した画面）。「・」で始まる行は箇条書きになる
+- メニューの料金が言葉（「施術内容により異なります」など）のときは名前の下に出し、名前を横いっぱいに使う（スマホ・文字の大きさ「特大」でもつぶれない）

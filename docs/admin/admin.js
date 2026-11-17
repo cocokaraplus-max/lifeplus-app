@@ -1520,7 +1520,7 @@
       '<p class="note">お客さまの予約ページで「予約する」の前と、ご予約の状況の下に出ます。空にすると出しません。<br>' +
       '<b>{予約}</b>・<b>{取消}</b>・<b>{回数}</b> と書いたところは、上の締め切りと回数に置きかわります（設定を変えても文を直さなくて大丈夫です）。</p>' +
       '<textarea id="sx" rows="6" maxlength="600" style="width:100%;box-sizing:border-box;font:inherit;padding:10px;border-radius:10px;border:1.5px solid #cfd6e4">' + esc(S.cancelNotice != null ? S.cancelNotice : "") + '</textarea>' +
-      '<div class="row" style="justify-content:space-between;align-items:center;margin-top:6px"><span class="note">お客さまに見える形</span>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:10px"><span class="note" style="margin:0">お客さまに見える形</span>' +
       '<button class="link" id="sxdef">元の文に戻す</button></div>' +
       '<div id="sxpv" class="note" style="background:#f6f7fb;border-radius:10px;padding:10px 12px;line-height:1.7;color:#3b4458"></div></div>';
     h += '<button class="btn mint wide" id="sgo">保存する</button><button class="btn gray wide" id="sre">元に戻す（保存しない）</button>';
