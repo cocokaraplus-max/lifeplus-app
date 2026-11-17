@@ -1509,10 +1509,20 @@
     });
     h += "</div>";
     h += '<div class="card"><h2 style="margin-top:0">予約の決まりごと</h2>' +
-      '<label class="f"><span>予約・取消の締め切り（開始の何分前まで）</span><input type="number" id="sl" min="0" max="2880" step="15" value="' + esc(S.leadMinutes) + '"></label>' +
+      '<label class="f"><span>予約の締め切り（開始の何分前まで予約を受け付けるか）</span><input type="number" id="sl" min="0" max="2880" step="15" value="' + esc(S.leadMinutes) + '"></label>' +
+      // lifeplus-cancel-rule-v1: 取り消しの締め切りは予約と別に決める。過ぎた予約は、お客さまの画面に取り消しのボタンを出さない
+      '<label class="f"><span>取り消しの締め切り（開始の何分前までお客さまが自分で取り消せるか）</span><input type="number" id="sc" min="0" max="2880" step="15" value="' + esc(S.cancelMinutes != null ? S.cancelMinutes : S.leadMinutes) + '"></label>' +
       '<label class="f"><span>何日先まで予約できるか</span><input type="number" id="sh" min="1" max="365" value="' + esc(S.horizonDays) + '"></label>' +
       '<label class="f"><span>ドタキャンが何回続いたら、通院中でも仮予約に戻すか</span><input type="number" id="sn" min="1" max="10" value="' + esc(S.noshowLimit) + '"></label>' +
-      '<p class="note">締め切りと何日先までは、お客さまの予約ページに使われます。手で入れる予約には効きません。</p></div>';
+      '<p class="note">締め切りと何日先までは、お客さまの予約ページに使われます。手で入れる予約・取り消しには効きません。</p></div>';
+    // lifeplus-cancel-rule-v1: キャンセルの案内（予約ページの「予約する」の前と、ご予約の状況の下に出る）
+    h += '<div class="card"><h2 style="margin-top:0">キャンセルの案内</h2>' +
+      '<p class="note">お客さまの予約ページで「予約する」の前と、ご予約の状況の下に出ます。空にすると出しません。<br>' +
+      '<b>{予約}</b>・<b>{取消}</b>・<b>{回数}</b> と書いたところは、上の締め切りと回数に置きかわります（設定を変えても文を直さなくて大丈夫です）。</p>' +
+      '<textarea id="sx" rows="6" maxlength="600" style="width:100%;box-sizing:border-box;font:inherit;padding:10px;border-radius:10px;border:1.5px solid #cfd6e4">' + esc(S.cancelNotice != null ? S.cancelNotice : "") + '</textarea>' +
+      '<div class="row" style="justify-content:space-between;align-items:center;margin-top:6px"><span class="note">お客さまに見える形</span>' +
+      '<button class="link" id="sxdef">元の文に戻す</button></div>' +
+      '<div id="sxpv" class="note" style="background:#f6f7fb;border-radius:10px;padding:10px 12px;line-height:1.7;color:#3b4458"></div></div>';
     h += '<button class="btn mint wide" id="sgo">保存する</button><button class="btn gray wide" id="sre">元に戻す（保存しない）</button>';
     h += menusCard();   // lifeplus-menu-edit-v1
     frame('<div class="day"><h1 class="title">設定</h1></div><div class="sub">受付時間・予約の決まりごと・予約のメニュー</div>', h);
@@ -1530,12 +1540,23 @@
     $$("[data-ho]").forEach(function (el) { el.onchange = function () { S.hours[Number(el.getAttribute("data-ho"))].open = el.value; }; });
     $$("[data-hc]").forEach(function (el) { el.onchange = function () { S.hours[Number(el.getAttribute("data-hc"))].close = el.value; }; });
     $("#sre").onclick = function () { showSettings(); };
+    // lifeplus-cancel-rule-v1: 案内の見え方をその場で出す（サーバーの cancelNoticeText と同じ置きかえ）
+    var mt = function (n) { n = Number(n); if (!(n > 0)) return "開始時刻"; var hh = Math.floor(n / 60), mm = n % 60; return (hh ? hh + "時間" : "") + (mm ? mm + "分" : ""); };
+    var pv = function () {
+      var t = String($("#sx").value || "").replace(/\{予約\}/g, mt($("#sl").value)).replace(/\{取消\}/g, mt($("#sc").value)).replace(/\{回数\}/g, String($("#sn").value)).trim();
+      $("#sxpv").innerHTML = t ? esc(t).replace(/\n/g, "<br>") : "（空なので、お客さまには出しません）";
+    };
+    ["#sx", "#sl", "#sc", "#sn"].forEach(function (q) { $(q).addEventListener("input", pv); });
+    $("#sxdef").onclick = function () { $("#sx").value = S.cancelNoticeDefault || ""; pv(); };
+    pv();
     $("#sgo").onclick = function () {
       S.leadMinutes = num($("#sl")); S.horizonDays = num($("#sh")); S.noshowLimit = num($("#sn"));
+      S.cancelMinutes = num($("#sc")); S.cancelNotice = $("#sx").value;   // lifeplus-cancel-rule-v1
       for (var i = 0; i < S.hours.length; i++) {
         if (toMin(S.hours[i].close) <= toMin(S.hours[i].open)) { toast("「何時まで」は「何時から」より後にしてください。"); return; }
       }
-      busy($("#sgo"), api("admin_settings_save", { hours: S.hours, leadMinutes: S.leadMinutes, horizonDays: S.horizonDays, noshowLimit: S.noshowLimit }))
+      busy($("#sgo"), api("admin_settings_save", { hours: S.hours, leadMinutes: S.leadMinutes, horizonDays: S.horizonDays, noshowLimit: S.noshowLimit,
+                                         cancelMinutes: S.cancelMinutes, cancelNotice: S.cancelNotice }))
         .then(function (r) {
           A.set = JSON.parse(JSON.stringify(r));
           return api("admin_init").then(function (d) { d.me = A.init.me; A.init = d; renderSettings(); toast("保存しました"); });

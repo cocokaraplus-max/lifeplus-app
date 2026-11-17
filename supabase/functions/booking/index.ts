@@ -238,6 +238,35 @@ async function tellOwner(deps: Deps, text: string) {
   }
 }
 
+// ---------- 取り消しの締め切りとキャンセルの案内  marker: lifeplus-cancel-rule-v1 ----------
+//   ・取り消しの締め切り（cancel_minutes）は、予約の締め切り（lead_minutes）と別に決める。まだ決めていなければ予約と同じ
+//   ・キャンセルの案内（cancel_notice）は管理画面で書く。{予約}{取消}{回数} は、今の設定の値に置きかえて出す
+//     （設定を変えても案内の文を直さなくてよいように）。空にすると案内は出さない
+export const CANCEL_NOTICE_DEFAULT =
+  "・ご予約の取り消しは、開始の{取消}前まで、この画面からできます。\n" +
+  "・それより後の取り消しは、LINEのトークかお電話でお知らせください。\n" +
+  "・ご連絡のないキャンセルが{回数}回続いた方は、次のご予約から「仮予約」でお預かりし、こちらで確かめてから確定します。";
+export function minText(n: number): string {
+  if (!(n > 0)) return "開始時刻";
+  const h = Math.floor(n / 60), m = n % 60;
+  return (h ? h + "時間" : "") + (m ? m + "分" : "");
+}
+export function cancelNoticeText(raw: string, leadMin: number, cancelMin: number, noshow: number): string {
+  return String(raw ?? "").replace(/\{予約\}/g, minText(leadMin)).replace(/\{取消\}/g, minText(cancelMin))
+    .replace(/\{回数\}/g, String(noshow)).trim();
+}
+async function ruleOf(sql: Sql) {
+  const rows = await sql`select key, value from app_settings where key in ('lead_minutes','cancel_minutes','noshow_limit','cancel_notice')`;
+  const m: Record<string, string> = {};
+  for (const r of rows) m[r.key] = r.value;
+  const lead = Number(m.lead_minutes ?? 60);
+  const cancel = m.cancel_minutes != null ? Number(m.cancel_minutes) : lead;
+  const noshow = Number(m.noshow_limit ?? 2);
+  const raw = m.cancel_notice != null ? m.cancel_notice : CANCEL_NOTICE_DEFAULT;
+  return { leadMinutes: lead, cancelMinutes: cancel, noshowLimit: noshow, cancelNoticeRaw: raw,
+           cancelNotice: cancelNoticeText(raw, lead, cancel, noshow), cancelText: minText(cancel) };
+}
+
 // lifeplus-settings-v1: 設定画面へ返すもの
 const HM15_RE = /^([01]\d|2[0-4]):(00|15|30|45)$/;
 function hmMin(t: string) { const p = t.split(":"); return Number(p[0]) * 60 + Number(p[1]); }
@@ -251,6 +280,10 @@ async function settingsOut(sql: Sql) {
     leadMinutes: Number(m.lead_minutes ?? 60),
     horizonDays: Number(m.horizon_days ?? 60),
     noshowLimit: Number(m.noshow_limit ?? 2),
+    ...(await (async () => {   // lifeplus-cancel-rule-v1
+      const r = await ruleOf(sql);
+      return { cancelMinutes: r.cancelMinutes, cancelNotice: r.cancelNoticeRaw, cancelNoticeDefault: CANCEL_NOTICE_DEFAULT };
+    })()),
   };
 }
 
@@ -258,13 +291,16 @@ async function settings(sql: Sql) {
   const rows = await sql`select key, value from app_settings`;
   const m: Record<string, string> = {};
   for (const r of rows) m[r.key] = r.value;
+  const r = await ruleOf(sql);   // lifeplus-cancel-rule-v1
   return {
     leadMinutes: Number(m.lead_minutes ?? 60),
     horizonDays: Number(m.horizon_days ?? 60),
+    cancelMinutes: r.cancelMinutes, cancelText: r.cancelText, cancelNotice: r.cancelNotice,
   };
 }
 
 async function myBookings(sql: Sql, customerId: string, now: Date) {
+  const cutoff = now.getTime() + (await ruleOf(sql)).cancelMinutes * 60000;   // lifeplus-cancel-rule-v1
   const rows = await sql`
     select b.id, b.starts_at, b.ends_at, b.status, b.price_yen,
            m.name as menu_name, m.duration_min, bz.name as business_name, bz.id as business_id
@@ -289,6 +325,7 @@ async function myBookings(sql: Sql, customerId: string, now: Date) {
       menuName: r.menu_name,
       businessId: r.business_id,
       businessName: r.business_name,
+      canCancel: s.getTime() >= cutoff,   // lifeplus-cancel-rule-v1: 締め切りを過ぎたら、お客さまは取り消せない
     };
   });
 }
@@ -1012,7 +1049,7 @@ export async function handle(body: any, deps: Deps): Promise<Record<string, unkn
       const id = str(body.bookingId, 40);
       if (!UUID_RE.test(id)) throw new ApiError("booking_not_found");
       const st = await settings(sql);
-      const limit = new Date(now.getTime() + st.leadMinutes * 60000).toISOString();
+      const limit = new Date(now.getTime() + st.cancelMinutes * 60000).toISOString();   // lifeplus-cancel-rule-v1: 取り消しの締め切り
       const rows = await sql`
         update bookings set status = 'cancelled', cancelled_at = now()
         where id = ${id}::uuid and customer_id = ${cust.id}
@@ -1654,6 +1691,17 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
       if (!Number.isInteger(lead) || lead < 0 || lead > 2880) throw new ApiError("settings_invalid");
       if (!Number.isInteger(horizon) || horizon < 1 || horizon > 365) throw new ApiError("settings_invalid");
       if (!Number.isInteger(noshow) || noshow < 1 || noshow > 10) throw new ApiError("settings_invalid");
+      // lifeplus-cancel-rule-v1: 取り消しの締め切りとキャンセルの案内（送られてこなければ今のまま）
+      const extra: [string, string][] = [];
+      if (body.cancelMinutes !== undefined) {
+        const cm = Number(body.cancelMinutes);
+        if (!Number.isInteger(cm) || cm < 0 || cm > 2880) throw new ApiError("settings_invalid");
+        extra.push(["cancel_minutes", String(cm)]);
+      }
+      if (body.cancelNotice !== undefined) {
+        if (typeof body.cancelNotice !== "string" || body.cancelNotice.length > 600) throw new ApiError("settings_invalid");
+        extra.push(["cancel_notice", body.cancelNotice.replace(/\r\n?/g, "\n").split("\n").map((x: string) => x.trimEnd()).join("\n").trim()]);
+      }
       await sql.begin(async (tx: Sql) => {
         await tx`delete from business_hours`;
         for (const h of hours) {
@@ -1662,6 +1710,9 @@ async function handleAdmin(body: any, deps: Deps, now: Date): Promise<Record<str
         }
         for (const [k, v] of [["lead_minutes", lead], ["horizon_days", horizon], ["noshow_limit", noshow]] as [string, number][]) {
           await tx`insert into app_settings (key, value) values (${k}, ${String(v)}) on conflict (key) do update set value = excluded.value`;
+        }
+        for (const [k, v] of extra) {   // lifeplus-cancel-rule-v1
+          await tx`insert into app_settings (key, value) values (${k}, ${v}) on conflict (key) do update set value = excluded.value`;
         }
       });
       return await settingsOut(sql);

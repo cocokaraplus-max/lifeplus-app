@@ -120,12 +120,15 @@
           '<span class="badge ' + esc(b.status) + '">' + (b.status === "confirmed" ? "確定" : "確認<br>待ち") + "</span>" +
           '<div class="what">' + esc(b.businessName) + "　" + esc(b.menuName) + "</div>" +
           (b.status === "pending" ? '<div class="what">確定したらLINEでお知らせします。</div>' : "") +
-          '<div class="actions"><button class="btn danger" data-cancel="' + esc(b.id) + '">このご予約を取り消す</button></div>' +
+          (b.canCancel === false   // lifeplus-cancel-rule-v1: 取り消しの締め切りを過ぎたら、ボタンは出さない
+            ? '<div class="late-note">取り消しの締め切り（開始の' + esc(cancelText()) + '前）を過ぎました。<br>取り消すときは、LINEのトークかお電話でお知らせください。</div>'
+            : '<div class="actions"><button class="btn danger" data-cancel="' + esc(b.id) + '">このご予約を取り消す</button></div>') +
           "</div>";
       });
     }
     h += '<button class="btn" id="new">新しく予約する</button>';
     if (S.data.profile.complete) h += '<button class="btn ghost" id="prof">お名前・お電話番号の変更</button>';
+    h += policyHtml(false);   // lifeplus-cancel-rule-v1
     view(h);
     document.getElementById("new").onclick = function () { startBooking(); };
     var pf = document.getElementById("prof");
@@ -133,6 +136,16 @@
     Array.prototype.forEach.call($app.querySelectorAll("[data-cancel]"), function (btn) {
       btn.onclick = function () { cancel(btn.getAttribute("data-cancel")); };
     });
+  }
+
+  // lifeplus-cancel-rule-v1: キャンセルの案内（管理画面で書いた文。空なら出さない）
+  function cancelText() { var st = (S.data && S.data.settings) || {}; return st.cancelText || "1時間"; }
+  function policyHtml(open) {
+    var t = ((S.data && S.data.settings) || {}).cancelNotice || "";
+    if (!t) return "";
+    var body = '<div class="policy-b">' + esc(t).replace(/\n/g, "<br>") + "</div>";
+    return open ? '<div class="card policy"><h3>キャンセルについて</h3>' + body + "</div>"
+      : '<details class="card policy"><summary>キャンセルについて</summary>' + body + "</details>";
   }
 
   function cancel(id) {
@@ -387,6 +400,7 @@
       (p.isReturning ? "" : p.noShowHold
         ? '<div class="info">ご来院のない予約が続いたため、<br>今回は「仮予約」でお預かりします。<br>確定したらLINEでお知らせします。</div>'
         : '<div class="info">初めての方は「仮予約」になります。<br>確定したらLINEでお知らせします。</div>') +
+      policyHtml(true) +   // lifeplus-cancel-rule-v1: 予約する前に、キャンセルの決まりを読んでもらう
       '<button class="btn" id="book">予約する</button>';
     view(h);
     document.getElementById("back").onclick = function () { chooseSymptoms(); };
